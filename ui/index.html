@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>samplevault</title>
+<style>
+  :root {
+    --paper: #e7e8df;
+    --paper-2: #dcdece;
+    --paper-3: #cfd2be;
+    --ink: #172a66;
+    --flag: #ff3d71;
+    --mute: #6d7488;
+    --edge: rgba(23, 42, 102, 0.16);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --pad: 14px;
+    --rail: 300px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1330;
+      --paper-2: #171e40;
+      --paper-3: #202951;
+      --ink: #dfe5ff;
+      --flag: #ff5c85;
+      --mute: #8790ad;
+      --edge: rgba(223, 229, 255, 0.18);
+    }
+  }
+
+  * { box-sizing: border-box; min-width: 0; }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 14px/1.45 var(--mono);
+    background-image: radial-gradient(circle at 12% -8%, rgba(255, 61, 113, 0.09), transparent 46%);
+    /* The whole app is one viewport-height frame; each pane scrolls itself. */
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  :focus-visible { outline: 2px solid var(--flag); outline-offset: 2px; }
+
+  button, input, select { font: inherit; color: inherit; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+    padding: 10px var(--pad); border-bottom: 1px solid var(--edge);
+  }
+  .wordmark { font-weight: 800; letter-spacing: -0.04em; text-transform: uppercase; font-size: 18px; }
+  .wordmark em { font-style: normal; color: var(--flag); }
+  .backlink {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--flag); padding-bottom: 1px;
+  }
+  .backlink:hover { color: var(--flag); }
+  .tally { font-size: 12px; color: var(--mute); margin-left: auto; }
+  .tally b { color: var(--ink); font-weight: 700; }
+
+  /* ---------- connect bar: the thing you paste into Strudel ---------- */
+
+  .connect {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px var(--pad);
+    background: var(--paper-2); border-bottom: 2px solid var(--ink);
+  }
+  .connect .lede {
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute);
+  }
+  .connect code {
+    flex: 1 1 320px; min-width: 0;
+    background: var(--paper); border: 1px solid var(--edge); border-left: 3px solid var(--flag);
+    padding: 6px 9px; font-size: 12px;
+    overflow-x: auto; white-space: nowrap;
+  }
+
+  .btn {
+    font-weight: 700; cursor: pointer; border-radius: 2px; white-space: nowrap;
+    padding: 6px 12px; border: 1px solid var(--ink); background: none; color: var(--ink);
+  }
+  .btn:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .btn.primary { background: var(--flag); border-color: var(--flag); color: #fff; }
+  .btn.primary:hover:not(:disabled) { filter: brightness(0.92); background: var(--flag); color: #fff; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn.tiny { padding: 4px 8px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
+
+  /* ---------- two independently scrolling panes ---------- */
+
+  .stage { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 0; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; grid-template-rows: 40% 60%; } }
+
+  .rail {
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+    border-right: 1px solid var(--edge); min-height: 0;
+  }
+  .rail-head { padding: 10px var(--pad) 8px; border-bottom: 1px solid var(--edge); }
+  .rail-list { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 12px; }
+  .rail-foot { padding: 8px var(--pad); border-top: 1px solid var(--edge); }
+
+  .pane { overflow-y: auto; overscroll-behavior: contain; padding: var(--pad); min-height: 0; }
+
+  .filter { display: flex; gap: 6px; align-items: center; }
+  .filter input {
+    flex: 1; background: var(--paper-2); border: 1px solid var(--edge);
+    border-radius: 2px; padding: 5px 8px; font-size: 13px;
+  }
+
+  .group-head {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    font: inherit; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--mute); padding: 10px var(--pad) 4px; text-align: left;
+    background: var(--paper); border: 0; cursor: pointer;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .group-head:hover { color: var(--ink); }
+  .group-head .caret { width: 9px; flex: 0 0 auto; }
+  .group-head .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .group-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--flag); flex: 0 0 auto; }
+  .group-head .dot.local { background: var(--ink); }
+  .group-head .n { margin-left: auto; }
+
+  /* The overlap bug: the name must be allowed to shrink and clip. */
+  .sound-btn {
+    display: grid; grid-template-columns: 18px minmax(0, 1fr) auto;
+    gap: 6px; align-items: center; width: 100%;
+    background: none; border: 0; border-left: 3px solid transparent;
+    text-align: left; padding: 5px var(--pad) 5px 11px; cursor: pointer;
+  }
+  .sound-btn:hover { background: var(--paper-2); }
+  .sound-btn[aria-current="true"] { border-left-color: var(--flag); background: var(--paper-2); }
+  .sound-btn .nm {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13px; direction: rtl; text-align: left;
+  }
+  .sound-btn[aria-current="true"] .nm { font-weight: 700; }
+  .sound-btn .count { color: var(--mute); font-size: 11px; }
+  .star {
+    background: none; border: 0; color: var(--edge); cursor: pointer;
+    line-height: 1; padding: 0; font-size: 13px;
+  }
+  .star[aria-pressed="true"] { color: var(--flag); }
+  .star:hover { color: var(--flag); }
+
+  /* ---------- file list ---------- */
+
+  .sound-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin: 0 0 2px; }
+  .sound-title h2 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  .via { color: var(--flag); font-size: 10px; letter-spacing: 0.1em; }
+  .hint { color: var(--mute); font-size: 12px; margin: 0 0 12px; overflow-wrap: anywhere; }
+
+  .row {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr) 108px 52px 32px;
+    gap: 10px; align-items: center; width: 100%;
+    padding: 6px 4px; border: 0; border-bottom: 1px solid var(--edge);
+    background: none; text-align: left; cursor: pointer;
+  }
+  .row:hover, .row.is-cued { background: var(--paper-2); }
+  .row .idx { color: var(--flag); font-weight: 700; font-size: 12px; }
+  .row .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .row .dur { color: var(--mute); font-size: 12px; text-align: right; }
+  .row .add {
+    border: 1px solid var(--edge); border-radius: 2px; background: none;
+    text-align: center; padding: 3px 0; font-weight: 700; cursor: pointer;
+  }
+  .row .add:hover { border-color: var(--flag); color: var(--flag); }
+  @media (max-width: 620px) {
+    .row { grid-template-columns: 30px minmax(0, 1fr) 44px 30px; }
+    .row .wave { display: none; }
+  }
+  .wave { display: block; width: 108px; height: 22px; }
+  .wave rect { fill: var(--flag); }
+  .wave.pending rect { fill: var(--edge); }
+
+  /* ---------- getting started ---------- */
+
+  .guide { max-width: 620px; }
+  .guide h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+  .guide ol { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  .guide li {
+    counter-increment: step; position: relative;
+    padding: 0 0 16px 34px; border-left: 1px solid var(--edge); margin-left: 9px;
+  }
+  .guide li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .guide li::before {
+    content: counter(step); position: absolute; left: -10px; top: 0;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--flag); color: #fff; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .guide b { display: block; margin-bottom: 2px; }
+  .guide p { margin: 0; color: var(--mute); font-size: 13px; }
+  .guide code {
+    display: inline-block; margin-top: 4px; background: var(--paper-2);
+    border-left: 2px solid var(--flag); padding: 3px 7px; font-size: 12px; color: var(--ink);
+  }
+
+  /* ---------- source manager ---------- */
+
+  .src {
+    border: 1px solid var(--edge); border-left: 3px solid var(--flag);
+    padding: 10px 12px; margin-bottom: 10px; background: var(--paper-2);
+  }
+  .src h3 { margin: 0 0 2px; font-size: 14px; font-weight: 700; }
+  .src .meta { color: var(--mute); font-size: 12px; overflow-wrap: anywhere; margin: 0 0 8px; }
+  .src .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .src.unresolved { border-left-color: var(--mute); }
+
+  .form { display: grid; gap: 8px; max-width: 560px; }
+  .form label { display: grid; gap: 3px; font-size: 12px; color: var(--mute); }
+  .form input, .form select {
+    background: var(--paper-2); border: 1px solid var(--edge); border-radius: 2px; padding: 6px 8px;
+  }
+  .form .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .form .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+  .preview-row {
+    display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto;
+    gap: 10px; align-items: center; width: 100%;
+    padding: 6px 4px; border: 0; border-bottom: 1px solid var(--edge);
+    background: none; text-align: left; cursor: pointer;
+  }
+  .preview-row:hover { background: var(--paper-2); }
+  .preview-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .preview-row .warn { color: var(--flag); font-size: 10px; letter-spacing: 0.1em; }
+
+  /* ---------- pack bench ---------- */
+
+  .bench { border-top: 2px solid var(--ink); padding: 10px var(--pad); background: var(--paper); }
+  .bench-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .bench-head .lede { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+  .bench-head input, .bench-head select {
+    background: var(--paper-2); border: 1px solid var(--edge); border-radius: 2px; padding: 5px 8px;
+  }
+  .bench-head input { width: 130px; }
+
+  .splice { display: flex; overflow-x: auto; padding-bottom: 4px; }
+  .chip {
+    flex: 0 0 auto; width: 132px; border: 1px solid var(--ink); border-right-width: 0;
+    padding: 5px 7px; background: var(--paper-2);
+  }
+  .chip:last-child { border-right-width: 1px; }
+  .chip .slot { color: var(--flag); font-weight: 700; font-size: 11px; }
+  .chip .who { font-size: 11px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .tools { display: flex; gap: 2px; margin-top: 3px; }
+  .chip .tools button {
+    flex: 1; font-size: 11px; line-height: 1; padding: 3px 0; border-radius: 2px;
+    border: 1px solid var(--edge); background: none; cursor: pointer;
+  }
+  .chip .tools button:hover:not(:disabled) { border-color: var(--flag); color: var(--flag); }
+  .chip .tools button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .empty { color: var(--mute); font-size: 12px; padding: 6px 0; }
+  .note { font-size: 12px; margin: 6px 0 0; min-height: 1.3em; }
+  .note.bad { color: var(--flag); }
+  .note code { background: var(--paper-2); padding: 1px 5px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <span class="wordmark">sample<em>vault</em></span>
+  <a class="backlink" href="../../" title="Back to patternvault">patternvault ↗</a>
+  <button class="btn tiny" id="help">How this works</button>
+  <span class="tally" id="tally"></span>
+</header>
+
+<section class="connect">
+  <span class="lede">Paste into Strudel</span>
+  <code id="connectline">loading…</code>
+  <select id="viewpick" title="Which manifest to load"><option value="">Whole library</option></select>
+  <button class="btn primary" id="copyurl">Copy</button>
+  <button class="btn tiny" id="refresh" hidden title="Re-fetch every remote source index">Refresh sources</button>
+</section>
+
+<div class="stage">
+  <nav class="rail" aria-label="Sounds">
+    <div class="rail-head">
+      <div class="filter">
+        <input id="filter" placeholder="Filter sounds  (/)" spellcheck="false" autocomplete="off">
+        <button class="btn tiny" id="onlystar" aria-pressed="false" title="Show only starred">★</button>
+      </div>
+    </div>
+    <div class="rail-list" id="soundlist"></div>
+    <div class="rail-foot">
+      <button class="btn tiny" id="managesources">Remote repos…</button>
+    </div>
+  </nav>
+
+  <section class="pane" id="pane" aria-live="polite"></section>
+</div>
+
+<section class="bench" aria-label="Pack builder">
+  <div class="bench-head">
+    <span class="lede">Pack</span>
+    <input id="packname" value="mypack" spellcheck="false" autocomplete="off">
+    <button class="btn" id="playpack">Play through</button>
+    <button class="btn primary" id="publish">Add to library</button>
+    <button class="btn" id="copypack">Copy as snippet</button>
+    <button class="btn tiny" id="clear">Clear</button>
+    <span class="lede" id="starstate" style="margin-left:auto"></span>
+    <input id="viewname" placeholder="view name" spellcheck="false" autocomplete="off">
+    <button class="btn tiny" id="saveview">Save starred as view</button>
+    <button class="btn tiny" id="delview">Delete view</button>
+  </div>
+  <div class="splice" id="splice"></div>
+  <p class="empty" id="benchempty">Pick a sound on the left, then press <b>+</b> on the files you want. They become <b>:0 :1 :2</b> in order.</p>
+  <p class="note" id="note"></p>
+</section>
+
+<script>
+const MANIFEST_URL = '../strudel.json'
+const VIEW_BASE = '../m/'
+const API = '../api'
+const STORE = 'samplevault:pack'
+
+const state = {
+  base: '',
+  sounds: {},
+  origin: {},
+  sources: [],
+  views: [],
+  starred: new Set(),
+  current: null,
+  cued: 0,
+  pack: [],
+  filter: '',
+  onlyStarred: false,
+  apiUp: false,
+  mode: 'guide',        // guide | sound | sources
+  collapsed: new Set(), // group ids that are folded shut ('local' or a source id)
+  preview: null,        // { id, origin, sounds, collisions, def }
+  editing: null,        // source def being edited, or a blank one
+}
+
+try {
+  const folded = JSON.parse(localStorage.getItem('samplevault:collapsed') || '[]')
+  if (Array.isArray(folded)) state.collapsed = new Set(folded)
+} catch {}
+const saveCollapsed = () => {
+  try { localStorage.setItem('samplevault:collapsed', JSON.stringify([...state.collapsed])) } catch {}
+}
+
+const $ = (id) => document.getElementById(id)
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const buffers = new Map()
+let ctx = null
+
+/* ---------- audio ---------- */
+
+function audio() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
+  if (ctx.state === 'suspended') void ctx.resume()
+  return ctx
+}
+
+async function load(path) {
+  if (buffers.has(path)) return buffers.get(path)
+  const res = await fetch(state.base + path)
+  if (!res.ok) throw new Error(`${res.status} on ${path}`)
+  const buf = await audio().decodeAudioData(await res.arrayBuffer())
+  buffers.set(path, buf)
+  return buf
+}
+
+async function play(path) {
+  const buf = await load(path)
+  const src = audio().createBufferSource()
+  src.buffer = buf
+  src.connect(audio().destination)
+  src.start(0)
+}
+
+async function playPack() {
+  let when = audio().currentTime + 0.05
+  for (const item of state.pack) {
+    const buf = await load(item.path)
+    const src = audio().createBufferSource()
+    src.buffer = buf
+    src.connect(audio().destination)
+    src.start(when)
+    when += buf.duration
+  }
+}
+
+function waveSvg(buf) {
+  const data = buf.getChannelData(0)
+  const n = 48
+  const step = Math.floor(data.length / n) || 1
+  let bars = ''
+  for (let i = 0; i < n; i++) {
+    let peak = 0
+    for (let j = i * step; j < (i + 1) * step && j < data.length; j++) {
+      const v = Math.abs(data[j])
+      if (v > peak) peak = v
+    }
+    const h = Math.max(1, Math.round(peak * 20))
+    bars += `<rect x="${i * 2.25}" y="${(22 - h) / 2}" width="1.5" height="${h}"/>`
+  }
+  return `<svg class="wave" viewBox="0 0 108 22" aria-hidden="true">${bars}</svg>`
+}
+
+/* ---------- connect line ---------- */
+
+function manifestUrl() {
+  const view = $('viewpick').value
+  return new URL(view ? `${VIEW_BASE}${view}.json` : MANIFEST_URL, location.href).href
+}
+function connectLine() {
+  return `samples("${manifestUrl()}")`
+}
+function renderConnect() {
+  $('connectline').textContent = connectLine()
+  $('delview').disabled = !$('viewpick').value || !state.apiUp
+}
+
+/* ---------- rail ---------- */
+
+function visibleNames() {
+  const q = state.filter.toLowerCase()
+  return Object.keys(state.sounds).filter((n) => {
+    if (state.onlyStarred && !state.starred.has(n)) return false
+    return !q || n.toLowerCase().includes(q)
+  })
+}
+
+function renderSounds() {
+  const names = visibleNames()
+  const groups = [{ id: 'local', label: 'Local', names: names.filter((n) => !state.origin[n]) }]
+  for (const src of state.sources) {
+    groups.push({ id: src.id, label: src.label, names: names.filter((n) => state.origin[n] === src.id) })
+  }
+
+  const html = groups
+    .filter((g) => g.names.length)
+    .map((g) => {
+      const shut = state.collapsed.has(g.id)
+      return `
+      <button class="group-head" data-group="${esc(g.id)}" aria-expanded="${!shut}">
+        <span class="caret">${shut ? '▸' : '▾'}</span>
+        <span class="dot${g.id === 'local' ? ' local' : ''}"></span>
+        <span class="lbl">${esc(g.label)}</span>
+        <span class="n">${g.names.length}</span>
+      </button>
+      ${shut ? '' : g.names.map((name) => `
+        <button class="sound-btn" data-sound="${esc(name)}" aria-current="${name === state.current}" title="${esc(name)}">
+          <span class="star" role="button" tabindex="-1" data-star="${esc(name)}" aria-pressed="${state.starred.has(name)}" title="Star for a view">${state.starred.has(name) ? '★' : '☆'}</span>
+          <span class="nm">&#8206;${esc(name)}</span>
+          <span class="count">${state.sounds[name].length}</span>
+        </button>`).join('')}`
+    })
+    .join('')
+
+  $('soundlist').innerHTML = html || '<p class="empty" style="padding:12px 14px">Nothing matches that filter.</p>'
+
+  const total = Object.keys(state.sounds).length
+  const variants = Object.values(state.sounds).reduce((n, v) => n + v.length, 0)
+  const remote = Object.keys(state.origin).length
+  $('tally').innerHTML = `<b>${total}</b> sounds${remote ? ` (<b>${remote}</b> remote)` : ''} · <b>${variants}</b> files`
+  $('starstate').textContent = state.starred.size ? `${state.starred.size} starred` : ''
+  $('saveview').disabled = !state.apiUp || state.starred.size === 0
+}
+
+/* ---------- main pane ---------- */
+
+function renderPane() {
+  if (state.mode === 'sources') return renderSources()
+  if (state.mode === 'guide' || !state.current) return renderGuide()
+
+  const files = state.sounds[state.current] ?? []
+  const via = state.origin[state.current]
+
+  $('pane').innerHTML = `
+    <div class="sound-title">
+      <h2>${esc(state.current)}</h2>
+      ${via ? `<span class="via">via ${esc(via)} ↗</span>` : ''}
+      ${!via && state.apiUp ? '<button class="btn tiny" id="rename">Rename</button>' : ''}
+      <button class="btn tiny" id="addall">Add all to pack</button>
+    </div>
+    <p class="hint">Use as <code>s("${esc(state.current)}:0")</code> … <code>:${files.length - 1}</code> — click a row to hear it.</p>
+    <div id="filelist">${files.map((path, i) => rowHtml(path, i)).join('')}</div>`
+}
+
+function rowHtml(path, i) {
+  const buf = buffers.get(path)
+  return `<button class="row${i === state.cued ? ' is-cued' : ''}" data-path="${esc(path)}" data-i="${i}">
+    <span class="idx">:${i}</span>
+    <span class="fname" title="${esc(path)}">${esc(path.split('/').pop())}</span>
+    ${buf ? waveSvg(buf) : '<svg class="wave pending" viewBox="0 0 108 22" aria-hidden="true"><rect x="0" y="10.5" width="108" height="1"/></svg>'}
+    <span class="dur">${buf ? buf.duration.toFixed(2) + 's' : ''}</span>
+    <span class="add" data-add="${i}" role="button" tabindex="-1" title="Add to pack">+</span>
+  </button>`
+}
+
+function renderGuide() {
+  $('pane').innerHTML = `
+    <div class="guide">
+      <h2>Making a pack and using it in a mix</h2>
+      <ol>
+        <li>
+          <b>Connect Strudel to this library</b>
+          <p>Copy the line at the top of this page and paste it as the first line of your pattern. That is all Strudel needs.</p>
+          <code>${esc(connectLine())}</code>
+        </li>
+        <li>
+          <b>Find sounds</b>
+          <p>Filter the list on the left, click a sound, then click any file to hear it. The waveform appears once it has played.</p>
+        </li>
+        <li>
+          <b>Build a pack</b>
+          <p>Press <b>+</b> on the files you want, in the order you want them. They become <b>:0 :1 :2</b> — a pack is just a hand-picked set of files that can pull from any folder, local or remote.</p>
+        </li>
+        <li>
+          <b>Add it to the library</b>
+          <p>Name the pack at the bottom and press <b>Add to library</b>. It joins the manifest immediately, so the line you already pasted picks it up.</p>
+          <code>s("mypack:0 mypack:1 ~ mypack:2")</code>
+        </li>
+        <li>
+          <b>Optional: pull in a public repo</b>
+          <p>Press <b>Remote repos…</b> at the bottom of the sidebar to index a public sample pack from GitHub. Preview it first — you can play its sounds before adding anything.</p>
+        </li>
+        <li>
+          <b>Optional: trim the library down</b>
+          <p>With hundreds of sounds indexed, star the ones you actually use and save them as a <b>view</b>. A view is its own manifest URL containing only those sounds — pick it in the dropdown above and copy the shorter line.</p>
+        </li>
+      </ol>
+    </div>`
+}
+
+/* ---------- remote sources ---------- */
+
+function renderSources() {
+  const d = state.editing
+  const p = state.preview
+
+  $('pane').innerHTML = `
+    <div class="sound-title"><h2>Remote repos</h2>
+      <button class="btn tiny" id="closesources">Back to library</button>
+    </div>
+    <p class="hint">Index a public sample repo and play its sounds through this server. Audio is proxied and cached here, so remote sounds work exactly like local ones.</p>
+
+    ${state.sources.map((s2) => `
+      <div class="src${s2.resolved ? '' : ' unresolved'}">
+        <h3>${esc(s2.label)} <span class="via">${esc(s2.id)}</span></h3>
+        <p class="meta">
+          ${s2.type === 'github' ? `github: ${esc(s2.repo)}@${esc(s2.ref || 'main')}${s2.path ? ' /' + esc(s2.path) : ''}` : esc(s2.url)}<br>
+          ${s2.resolved ? `${s2.sounds.length} sound(s), prefix <b>${esc(s2.prefix ?? s2.id + '_')}</b>` : 'not resolved — check the server log'}
+        </p>
+        <div class="acts">
+          <button class="btn tiny" data-editsrc="${esc(s2.id)}">Edit</button>
+          <button class="btn tiny" data-delsrc="${esc(s2.id)}">Remove</button>
+        </div>
+      </div>`).join('')}
+
+    ${state.sources.length ? '' : '<p class="empty">No remote repos yet.</p>'}
+
+    <div class="src" style="border-left-color: var(--ink)">
+      <h3>${d && d.existing ? 'Edit ' + esc(d.id) : 'Add a repo'}</h3>
+      <div class="form">
+        <div class="pair">
+          <label>Short id <input id="f_id" value="${esc(d?.id ?? '')}" placeholder="dirt" spellcheck="false"></label>
+          <label>Label <input id="f_label" value="${esc(d?.label ?? '')}" placeholder="Dirt-Samples" spellcheck="false"></label>
+        </div>
+        <label>Kind
+          <select id="f_type">
+            <option value="github"${d?.type !== 'manifest' ? ' selected' : ''}>GitHub repo</option>
+            <option value="manifest"${d?.type === 'manifest' ? ' selected' : ''}>Published strudel.json</option>
+          </select>
+        </label>
+        <div id="f_github" ${d?.type === 'manifest' ? 'hidden' : ''}>
+          <div class="pair">
+            <label>Repo <input id="f_repo" value="${esc(d?.repo ?? '')}" placeholder="tidalcycles/dirt-samples" spellcheck="false"></label>
+            <label>Ref (branch, tag, or commit SHA) <input id="f_ref" value="${esc(d?.ref ?? '')}" placeholder="main" spellcheck="false"></label>
+          </div>
+          <label style="margin-top:8px">Subfolder (optional, narrows a large repo) <input id="f_path" value="${esc(d?.path ?? '')}" placeholder="machines" spellcheck="false"></label>
+        </div>
+        <div id="f_manifest" ${d?.type === 'manifest' ? '' : 'hidden'}>
+          <label>Manifest URL <input id="f_url" value="${esc(d?.url ?? '')}" placeholder="https://example.org/samples/strudel.json" spellcheck="false"></label>
+        </div>
+        <label>Name prefix (blank for none; defaults to the id) <input id="f_prefix" value="${esc(d?.prefix ?? '')}" placeholder="dirt_" spellcheck="false"></label>
+        <div class="acts">
+          <button class="btn" id="dopreview">Preview</button>
+          <button class="btn primary" id="dosave" ${p ? '' : 'disabled'}>${d?.existing ? 'Save changes' : 'Add to library'}</button>
+          ${d?.existing ? '<button class="btn tiny" id="cancelsrc">Cancel</button>' : ''}
+        </div>
+      </div>
+    </div>
+
+    ${p ? `
+      <div class="src">
+        <h3>Preview: ${esc(p.id)} — ${p.sounds.length} sound(s)</h3>
+        <p class="meta">Playing straight from ${esc(p.origin)} through this server. Nothing is saved until you press ${d?.existing ? 'Save changes' : 'Add to library'}.
+        ${p.collisions.length ? `<br><span class="warn">${p.collisions.length} name(s) already exist and would be skipped — change the prefix.</span>` : ''}</p>
+        <div>
+          ${p.sounds.map((s3, i) => `
+            <button class="preview-row" data-pv="${i}">
+              <span class="idx" style="color:var(--flag);font-weight:700">▸</span>
+              <span class="nm" title="${esc(s3.name)}">${esc(s3.name)}</span>
+              <span class="count" style="color:var(--mute);font-size:11px">${s3.files.length} files</span>
+              ${p.collisions.includes(s3.name) ? '<span class="warn">CLASH</span>' : '<span></span>'}
+            </button>`).join('')}
+        </div>
+      </div>` : ''}`
+}
+
+function formDef() {
+  const type = $('f_type').value
+  const def = {
+    id: $('f_id').value.trim(),
+    label: $('f_label').value.trim() || undefined,
+    type,
+  }
+  if (type === 'github') {
+    def.repo = $('f_repo').value.trim()
+    if ($('f_ref').value.trim()) def.ref = $('f_ref').value.trim()
+    if ($('f_path').value.trim()) def.path = $('f_path').value.trim()
+  } else {
+    def.url = $('f_url').value.trim()
+  }
+  const prefix = $('f_prefix').value.trim()
+  if (prefix) def.prefix = prefix
+  return def
+}
+
+function openSources(editing) {
+  state.mode = 'sources'
+  state.preview = null
+  state.editing = editing ?? { type: 'github' }
+  renderPane()
+}
+
+/* ---------- pack ---------- */
+
+function renderPack() {
+  const has = state.pack.length > 0
+  $('benchempty').hidden = has
+  $('splice').innerHTML = state.pack.map((item, i) => `
+    <div class="chip">
+      <div class="slot">:${i}</div>
+      <div class="who" title="${esc(item.path)}">${item.path.startsWith('remote/') ? '<span class="via">↗</span> ' : ''}${esc(item.path.split('/').pop())}</div>
+      <div class="tools">
+        <button data-move="${i}" data-dir="-1" title="Move earlier" ${i === 0 ? 'disabled' : ''}>◀</button>
+        <button data-cue="${i}" title="Play">▸</button>
+        <button data-drop="${i}" title="Remove">✕</button>
+        <button data-move="${i}" data-dir="1" title="Move later" ${i === state.pack.length - 1 ? 'disabled' : ''}>▶</button>
+      </div>
+    </div>`).join('')
+
+  for (const id of ['playpack', 'copypack', 'clear']) $(id).disabled = !has
+  $('publish').disabled = !has || !state.apiUp
+  try { localStorage.setItem(STORE, JSON.stringify({ name: $('packname').value, pack: state.pack })) } catch {}
+}
+
+function packName() {
+  const raw = $('packname').value.trim()
+  return /^[A-Za-z0-9_]+$/.test(raw) ? raw : 'mypack'
+}
+
+function packSnippet() {
+  const files = state.pack.map((p) => `    "${p.path}"`).join(',\n')
+  return `samples({\n  ${packName()}: [\n${files}\n  ]\n}, "${state.base}")\n\n// s("${packName()}:0")`
+}
+
+function addToPack(i) {
+  const path = state.sounds[state.current]?.[i]
+  if (!path) return
+  state.pack.push({ path })
+  renderPack()
+  say(`Added at :${state.pack.length - 1} — name it below, then Add to library.`)
+}
+
+function say(msg, bad) {
+  $('note').innerHTML = msg
+  $('note').className = bad ? 'note bad' : 'note'
+}
+
+/* ---------- events ---------- */
+
+$('soundlist').addEventListener('click', (e) => {
+  const grp = e.target.closest('[data-group]')
+  if (grp) {
+    const id = grp.dataset.group
+    state.collapsed.has(id) ? state.collapsed.delete(id) : state.collapsed.add(id)
+    saveCollapsed()
+    return renderSounds()
+  }
+  const star = e.target.closest('[data-star]')
+  if (star) {
+    e.stopPropagation()
+    const n = star.dataset.star
+    state.starred.has(n) ? state.starred.delete(n) : state.starred.add(n)
+    return renderSounds()
+  }
+  const btn = e.target.closest('[data-sound]')
+  if (!btn) return
+  state.current = btn.dataset.sound
+  state.cued = 0
+  state.mode = 'sound'
+  renderSounds(); renderPane()
+})
+
+$('pane').addEventListener('click', async (e) => {
+  if (e.target.closest('#closesources')) { state.mode = state.current ? 'sound' : 'guide'; return renderPane() }
+  if (e.target.closest('#cancelsrc')) return openSources()
+
+  const edit = e.target.closest('[data-editsrc]')
+  if (edit) {
+    const def = state.sources.find((s2) => s2.id === edit.dataset.editsrc)
+    return openSources({ ...def, existing: def.id })
+  }
+
+  const del = e.target.closest('[data-delsrc]')
+  if (del) {
+    const id = del.dataset.delsrc
+    if (!confirm(`Remove "${id}"? Its sounds leave the library; cached audio stays on disk.`)) return
+    const res = await fetch(`${API}/sources/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (!res.ok) return say('Could not remove that repo.', true)
+    await boot(); openSources()
+    return say(`Removed "${esc(id)}".`)
+  }
+
+  if (e.target.closest('#dopreview')) return doPreview()
+  if (e.target.closest('#dosave')) return saveSource()
+
+  const pv = e.target.closest('[data-pv]')
+  if (pv) {
+    const sound = state.preview.sounds[Number(pv.dataset.pv)]
+    try {
+      await play(sound.files[0])
+      return say(`Playing ${esc(sound.name)}:0`)
+    } catch (err) {
+      return say(`Could not play that — ${esc(err.message)}`, true)
+    }
+  }
+
+  if (e.target.closest('#rename')) return rename()
+  if (e.target.closest('#addall')) {
+    for (const path of state.sounds[state.current] ?? []) state.pack.push({ path })
+    renderPack()
+    return say(`Added ${state.sounds[state.current].length} files to the pack.`)
+  }
+  const add = e.target.closest('[data-add]')
+  if (add) { e.stopPropagation(); return addToPack(Number(add.dataset.add)) }
+  const row = e.target.closest('[data-path]')
+  if (!row) return
+  state.cued = Number(row.dataset.i)
+  try {
+    await play(row.dataset.path)
+    renderPane(); say('')
+  } catch (err) {
+    say(`Could not play that file — ${esc(err.message)}`, true)
+  }
+})
+
+$('splice').addEventListener('click', (e) => {
+  const mv = e.target.closest('[data-move]')
+  if (mv) {
+    const i = Number(mv.dataset.move), d = Number(mv.dataset.dir)
+    const [item] = state.pack.splice(i, 1)
+    state.pack.splice(i + d, 0, item)
+    return renderPack()
+  }
+  const drop = e.target.closest('[data-drop]')
+  if (drop) { state.pack.splice(Number(drop.dataset.drop), 1); return renderPack() }
+  const cue = e.target.closest('[data-cue]')
+  if (cue) void play(state.pack[Number(cue.dataset.cue)].path)
+})
+
+$('pane').addEventListener('change', (e) => {
+  if (e.target.id !== 'f_type') return
+  const gh = e.target.value === 'github'
+  $('f_github').hidden = !gh
+  $('f_manifest').hidden = gh
+})
+
+$('filter').addEventListener('input', (e) => { state.filter = e.target.value; renderSounds() })
+$('onlystar').addEventListener('click', () => {
+  state.onlyStarred = !state.onlyStarred
+  $('onlystar').setAttribute('aria-pressed', String(state.onlyStarred))
+  $('onlystar').classList.toggle('primary', state.onlyStarred)
+  renderSounds()
+})
+
+$('help').addEventListener('click', () => { state.mode = 'guide'; renderPane() })
+$('managesources').addEventListener('click', () => openSources())
+$('viewpick').addEventListener('change', () => {
+  const view = state.views.find((v) => v.name === $('viewpick').value)
+  if (view) { state.starred = new Set(view.sounds); $('viewname').value = view.name }
+  renderConnect(); renderSounds()
+  say(view ? `Loaded view "${esc(view.name)}" — ${view.sounds.length} sounds starred.` : '')
+})
+
+$('copyurl').addEventListener('click', () => copy(connectLine(), 'Copied — paste it as the first line of your pattern.'))
+$('copypack').addEventListener('click', () => copy(packSnippet(), 'Copied. This keeps the pack in your pattern only — nothing is saved here.'))
+$('playpack').addEventListener('click', () => void playPack())
+$('clear').addEventListener('click', () => { state.pack = []; renderPack(); say('Pack cleared.') })
+
+$('publish').addEventListener('click', async () => {
+  const existing = await (await fetch(`${API}/packs`)).json()
+  const name = packName()
+  const body = existing.filter((p) => p.name !== name).concat({ name, files: state.pack.map((p) => p.path) })
+  const res = await fetch(`${API}/packs`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
+  say(`Added — use it now with <code>s("${esc(name)}:0")</code>`)
+  await boot()
+})
+
+$('saveview').addEventListener('click', async () => {
+  const name = $('viewname').value.trim()
+  if (!/^[A-Za-z0-9_]+$/.test(name)) return say('View names must be letters, digits, or underscores.', true)
+  const next = state.views.filter((v) => v.name !== name).concat({ name, sounds: [...state.starred] })
+  const res = await fetch(`${API}/views`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next),
+  })
+  const data = await res.json()
+  if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
+  state.views = data
+  renderViews()
+  $('viewpick').value = name
+  renderConnect()
+  say(`Saved view "${esc(name)}" — copy the shorter line above to load only those sounds.`)
+})
+
+$('delview').addEventListener('click', async () => {
+  const name = $('viewpick').value
+  if (!name) return
+  const res = await fetch(`${API}/views/${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!res.ok) return say('Could not delete that view.', true)
+  state.views = await res.json()
+  $('viewpick').value = ''
+  renderViews(); renderConnect()
+  say(`Deleted view "${esc(name)}".`)
+})
+
+$('refresh').addEventListener('click', async () => {
+  $('refresh').disabled = true
+  say('Re-fetching remote source indexes…')
+  try {
+    const data = await (await fetch(`${API}/sources/refresh`, { method: 'POST' })).json()
+    await boot()
+    say(`Refreshed: ${esc((data.refreshed || []).join(', ')) || 'nothing'}`)
+  } catch (err) {
+    say(`Refresh failed — ${esc(err.message)}`, true)
+  }
+  $('refresh').disabled = false
+})
+
+async function doPreview() {
+  const def = formDef()
+  say('Resolving…')
+  const res = await fetch(`${API}/sources/preview`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(def),
+  })
+  const data = await res.json()
+  if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
+  state.preview = data
+  state.editing = { ...def, existing: state.editing?.existing }
+  renderPane()
+  say(`Found ${data.sounds.length} sound(s) — click any of them to hear it before adding.`)
+}
+
+async function saveSource() {
+  const def = formDef()
+  const keep = state.sources.filter((s2) => s2.id !== def.id && s2.id !== state.editing?.existing)
+  const body = keep.map((s2) => ({
+    id: s2.id, label: s2.label, type: s2.type,
+    ...(s2.repo ? { repo: s2.repo } : {}), ...(s2.ref ? { ref: s2.ref } : {}),
+    ...(s2.path ? { path: s2.path } : {}), ...(s2.url ? { url: s2.url } : {}),
+    ...(s2.prefix !== undefined ? { prefix: s2.prefix } : {}),
+  })).concat(def)
+
+  const res = await fetch(`${API}/sources`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
+  await boot()
+  openSources()
+  say(`Saved "${esc(def.id)}" — its sounds are in the library now.`)
+}
+
+async function rename() {
+  const folders = await (await fetch(`${API}/folders`)).json()
+  const folder = folders[state.current]
+  if (!folder) return say('That sound has no folder to rename.', true)
+  const next = prompt(`New name for this folder:\n${folder}`, state.current)
+  if (!next) return
+  if (!/^[A-Za-z0-9_]+$/.test(next)) return say('Names must be letters, digits, or underscores.', true)
+  const names = await (await fetch(`${API}/names`)).json()
+  names[folder] = next
+  const res = await fetch(`${API}/names`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(names),
+  })
+  if (!res.ok) return say('Rename rejected.', true)
+  state.current = next
+  await boot()
+  say(`Renamed — now <code>s("${esc(next)}:0")</code>`)
+}
+
+async function copy(text, ok) {
+  try {
+    await navigator.clipboard.writeText(text)
+    say(ok)
+  } catch {
+    say(`Clipboard blocked. Copy this: <code>${esc(text.split('\n')[0])}</code>`, true)
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && e.target.tagName !== 'INPUT') { $('filter').focus(); return e.preventDefault() }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
+  const files = state.sounds[state.current] ?? []
+  if (!files.length || state.mode !== 'sound') return
+  if (e.key === 'ArrowDown' || e.key === 'j') { state.cued = Math.min(state.cued + 1, files.length - 1); renderPane(); e.preventDefault() }
+  else if (e.key === 'ArrowUp' || e.key === 'k') { state.cued = Math.max(state.cued - 1, 0); renderPane(); e.preventDefault() }
+  else if (e.key === ' ') { void play(files[state.cued]).then(renderPane); e.preventDefault() }
+  else if (e.key === 'a') { addToPack(state.cued); e.preventDefault() }
+})
+
+/* ---------- boot ---------- */
+
+function renderViews() {
+  const picked = $('viewpick').value
+  $('viewpick').innerHTML = '<option value="">Whole library</option>' +
+    state.views.map((v) => `<option value="${esc(v.name)}"${v.name === picked ? ' selected' : ''}>${esc(v.name)} — ${v.sounds.length} sounds</option>`).join('')
+}
+
+async function boot() {
+  const doc = await (await fetch(MANIFEST_URL, { cache: 'no-store' })).json()
+  state.base = doc._base || ''
+  state.sounds = {}
+  for (const [k, v] of Object.entries(doc)) if (k !== '_base') state.sounds[k] = v
+
+  state.origin = {}
+  state.sources = []
+  state.views = []
+  try {
+    const health = await fetch(`${API}/health`)
+    state.apiUp = health.ok
+    if (health.ok) {
+      state.sources = await (await fetch(`${API}/sources`)).json()
+      state.views = await (await fetch(`${API}/views`)).json()
+      for (const src of state.sources) for (const n of src.sounds) state.origin[n] = src.id
+    }
+  } catch { state.apiUp = false }
+
+  $('refresh').hidden = !state.apiUp || !state.sources.length
+  if (state.current && !state.sounds[state.current]) state.current = null
+
+  renderViews(); renderConnect(); renderSounds(); renderPane(); renderPack()
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE) || 'null')
+  if (saved?.pack) { state.pack = saved.pack; if (saved.name) $('packname').value = saved.name }
+} catch {}
+
+boot().catch((err) => say(`Could not load the library — ${esc(err.message)}`, true))
+</script>
+</body>
+</html>

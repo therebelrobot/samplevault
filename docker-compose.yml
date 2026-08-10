@@ -1,0 +1,58 @@
+services:
+  samplevault-api:
+    image: ghcr.io/therebelrobot/samplevault:latest
+    # Building from source instead? Uncomment:
+    # build: .
+    container_name: samplevault-api
+    restart: unless-stopped
+    environment:
+      SAMPLES_DIR: /srv/samples
+      # Must match the public URL the browser hits, with a trailing slash.
+      BASE_URL: ${BASE_URL:-http://localhost:3011/samples/}
+      NAME_SEP: "_"
+      NAME_DEPTH: "2"              # trailing path segments in a sound name; 0 = whole path
+      EXTS: wav,mp3,ogg
+      PORT: "3012"
+      WATCH: "1"
+      DEBOUNCE_MS: "500"
+      DB_PATH: /data/samplevault.json
+      SOURCES_FILE: /data/sources.json
+      # CACHE_DIR: /srv/samples/.cache   # default; move it if the volume is tight
+      REMOTE_TTL: "86400"          # seconds before a remote index is re-fetched
+      # GITHUB_TOKEN: ghp_...      # raises the tree API limit from 60/hr to 5000/hr
+      SERVE_STATIC: "0"            # nginx serves the UI and audio in this stack
+      # READ_ONLY: "1"             # serve manifests and audio, reject every write
+    volumes:
+      - ${SAMPLES_DIR:-./samples}:/srv/samples
+      # The UI store: small, and kept next to this file rather than on the
+      # samples volume. The cache deliberately does NOT live here.
+      - ${DB_DIR:-./data}:/data
+    expose:
+      - "3012"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  samplevault-web:
+    image: ghcr.io/therebelrobot/samplevault-web:latest
+    # Building from source instead? Uncomment:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.web
+    container_name: samplevault-web
+    restart: unless-stopped
+    ports:
+      - "3011:80"
+    volumes:
+      - ${SAMPLES_DIR:-./samples}:/srv/samples:ro
+      # Developing the UI? Override the baked-in copies:
+      # - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # - ./ui:/srv/ui:ro
+    depends_on:
+      - samplevault-api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"

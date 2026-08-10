@@ -1,0 +1,5 @@
+# Static front end with the UI and nginx config baked in, so consumers can run
+# the whole stack from published images without cloning anything.
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY ui /srv/ui

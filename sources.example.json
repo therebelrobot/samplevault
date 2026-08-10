@@ -1,0 +1,26 @@
+[
+  {
+    "id": "dirt",
+    "label": "Dirt-Samples",
+    "type": "github",
+    "repo": "tidalcycles/dirt-samples",
+    "ref": "master",
+    "prefix": "dirt_"
+  },
+  {
+    "id": "drums",
+    "label": "Tidal drum machines",
+    "type": "github",
+    "repo": "ritchse/tidal-drum-machines",
+    "ref": "main",
+    "path": "machines",
+    "prefix": "dm_"
+  },
+  {
+    "id": "friend",
+    "label": "Someone else's samplevault",
+    "type": "manifest",
+    "url": "https://example.org/samples/strudel.json",
+    "prefix": "fr_"
+  }
+]

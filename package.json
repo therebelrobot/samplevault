@@ -1,0 +1,29 @@
+{
+  "name": "samplevault",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Unlicense",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "docker:build": "docker build -t ghcr.io/therebelrobot/samplevault:local .",
+    "docker:run": "docker run --rm -p 3012:3012 -v $(pwd)/samples:/srv/samples ghcr.io/therebelrobot/samplevault:local",
+    "docker:push": "docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/therebelrobot/samplevault:latest --push .",
+    "release:patch": "npm version patch -m \"chore: release v%s\" && git push && git push --tags",
+    "release:minor": "npm version minor -m \"chore: release v%s\" && git push && git push --tags",
+    "release:major": "npm version major -m \"chore: release v%s\" && git push && git push --tags",
+    "release:tags": "git tag --sort=-v:refname | grep '^v'",
+    "docker:build:web": "docker build -f Dockerfile.web -t ghcr.io/therebelrobot/samplevault-web:local .",
+    "docker:push:web": "docker buildx build -f Dockerfile.web --platform linux/amd64,linux/arm64 -t ghcr.io/therebelrobot/samplevault-web:latest --push .",
+    "predev": "node -e \"const fs=require('fs');if(!fs.existsSync('.env')){fs.copyFileSync('.env.example','.env');console.log('created .env from .env.example — edit it if needed')}\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "description": "Sample library, auditioning UI, and ephemeral pack builder for Strudel — companion to patternvault"
+}

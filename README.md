@@ -109,6 +109,11 @@ through with no rewrite. Because the samples share an origin with the Strudel
 UI, whatever auth already protects that host covers them too, and **no CORS
 configuration is needed**.
 
+Visiting `/samples`, `/samples/`, or `/samples/ui` (no trailing slash) redirects
+to `/samples/ui/`. nginx prefix locations only match *with* the slash, so
+without those redirects the slashless URLs fall through to the catch-all and
+404 — which is what happens if you deploy an older `samplevault-web` image.
+
 > If the host is behind basic auth, verify the access list actually reaches the
 > new path — `curl -o /dev/null -w '%{http_code}\n' https://strudel.example.com/samples/strudel.json`
 > should return `401`. A `200` means auth was only applied to `/`, and you need

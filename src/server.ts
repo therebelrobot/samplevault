@@ -37,7 +37,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
   const { cfg, db, index, readOnly, reindex } = deps
   const url = new URL(req.url ?? '/', 'http://localhost')
 
-  if (url.pathname === '/') {
+  // Same trailing-slash forgiveness nginx does in production, so a URL that
+  // works in dev cannot 404 once deployed.
+  if (['/', '/samples', '/samples/', '/samples/ui'].includes(url.pathname)) {
     res.writeHead(302, { location: '/samples/ui/' })
     res.end()
     return

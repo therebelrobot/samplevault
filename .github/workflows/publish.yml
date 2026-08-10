@@ -34,7 +34,7 @@ jobs:
             dockerfile: Dockerfile.web
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # linux/arm64 is not optional here — the deploy target is a Pi.
       - uses: docker/setup-qemu-action@v3

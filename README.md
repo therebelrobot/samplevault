@@ -377,6 +377,42 @@ To develop the UI against published images, uncomment the two bind mounts under
 
 Also: `docker:run`, `release:patch|minor|major`, `release:tags`.
 
+### Releasing
+
+CI runs typecheck, bundle, a UI parse check, and both image builds on every push
+and PR.
+
+Publishing is automatic — `.github/workflows/publish.yml` builds both images for
+`linux/amd64` and `linux/arm64` and pushes to GHCR:
+
+| Trigger | Tags produced |
+| --- | --- |
+| push to `main` | `latest`, `sha-<short>` |
+| push of a `v*` tag | `1.2.3`, `1.2`, `sha-<short>` |
+| manual dispatch | same as the branch it runs on |
+
+So a release is just:
+
+```bash
+npm run release:patch      # npm version + git push --tags
+```
+
+The workflow authenticates with the built-in `GITHUB_TOKEN`; no PAT and no repo
+secrets to configure. It emits max-mode provenance and an SBOM, and pushes a
+signed build attestation to the registry, verifiable with:
+
+```bash
+gh attestation verify oci://ghcr.io/therebelrobot/samplevault:latest --owner therebelrobot
+```
+
+Actions are referenced by major tag with Dependabot watching them. Pin them to
+commit SHAs if you want the stronger supply-chain guarantee — Dependabot updates
+SHA-pinned actions too.
+
+**First push:** GHCR packages start private. After the first successful run, set
+both packages to public in the repo's Packages settings, or the compose file in
+the Quickstart will fail to pull for anyone else.
+
 ---
 
 ## Gotchas

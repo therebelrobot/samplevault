@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Bundle
+        run: npm run build
+
+      - name: UI parses
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('ui/index.html', 'utf8');
+            const script = html.match(/<script>([\s\S]*)<\/script>/);
+            if (!script) throw new Error('no script block found in ui/index.html');
+            new Function(script[1]);
+            console.log('ui/index.html script parses');
+          "
+
+      - name: Images build
+        run: |
+          docker build -f Dockerfile -t samplevault:ci .
+          docker build -f Dockerfile.web -t samplevault-web:ci .

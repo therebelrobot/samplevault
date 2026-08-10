@@ -5,5 +5,5 @@ dist
 # Local sample library and everything the service generates inside it
 samples/
 .DS_Store
-.vscode
 data/
+.vscode

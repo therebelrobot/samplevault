@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Actions are referenced by major tag below; Dependabot is what keeps them
+  # current. Pin to commit SHAs if you want the stronger guarantee — Dependabot
+  # updates those too, and keeps the version in a comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

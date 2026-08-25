@@ -4,7 +4,7 @@ import type { Index } from './index'
 import { renderManifest } from './manifest'
 import { validate } from './packs'
 import { serveRemote } from './proxy'
-import { knownFiles, SAFE_NAME, type Config } from './scan'
+import { knownFiles, SAFE_NAME, SAFE_NOTE, type Config } from './scan'
 import { serveFile } from './static'
 import { resolveSources, validateSourceDefs, type SourceDef } from './sources'
 
@@ -69,14 +69,14 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
   // --- manifests: rendered per request, never stored ---
 
   if (route === 'GET /api/manifest') {
-    return json(res, 200, renderManifest(cfg, index.sounds, db.packs))
+    return json(res, 200, renderManifest(cfg, index.sounds, db.packs, db.notes))
   }
 
   if (req.method === 'GET' && path.startsWith('/api/manifest/')) {
     const name = decodeURIComponent(path.slice('/api/manifest/'.length)).replace(/\.json$/, '')
     const view = db.views.find((v) => v.name === name)
     if (!view) return json(res, 404, { error: `no view named "${name}"` })
-    return json(res, 200, renderManifest(cfg, index.sounds, db.packs, view))
+    return json(res, 200, renderManifest(cfg, index.sounds, db.packs, db.notes, view))
   }
 
   if (req.method === 'GET' && path.startsWith('/api/remote/')) {
@@ -112,6 +112,7 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
   if (route === 'GET /api/packs') return json(res, 200, db.packs)
   if (route === 'GET /api/views') return json(res, 200, db.views)
   if (route === 'GET /api/names') return json(res, 200, db.names)
+  if (route === 'GET /api/notes') return json(res, 200, db.notes)
   if (route === 'GET /api/folders') return json(res, 200, deps.folders)
 
   // --- writes ---
@@ -228,6 +229,32 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
     })
     await reindex()
     return json(res, 200, db.names)
+  }
+
+  if (route === 'PUT /api/notes') {
+    const body = await readBody(req)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json(res, 422, { errors: ['expected an object of "file/path": "note"'] })
+    }
+    const errors: string[] = []
+    const known = knownFiles(index.sounds)
+    const notes: Record<string, string> = {}
+    for (const [file, note] of Object.entries(body as Record<string, unknown>)) {
+      if (typeof note !== 'string' || !SAFE_NOTE.test(note)) {
+        errors.push(`"${file}": "${String(note)}" is not a note like g3, bb3, or cs4`)
+        continue
+      }
+      if (!known.has(file)) {
+        errors.push(`"${file}" is not in the library`)
+        continue
+      }
+      notes[file] = note
+    }
+    if (errors.length) return json(res, 422, { errors })
+    await db.update((d) => {
+      d.notes = notes
+    })
+    return json(res, 200, db.notes)
   }
 
   json(res, 404, { error: 'no such route' })

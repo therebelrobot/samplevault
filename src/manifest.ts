@@ -2,15 +2,37 @@ import type { Pack, View } from './db'
 import type { Config, Sounds } from './scan'
 
 /**
+ * A sound plays by index (`:0 :1`) unless every one of its files has a note
+ * assigned, in which case it renders as Strudel's pitch-map form so
+ * `note(...).s(...)` picks the closest matching sample. Strudel does not
+ * support mixing the two within one entry, so a partially-noted sound falls
+ * back to the plain array until the rest are filled in.
+ */
+function renderEntry(files: string[], notes: Record<string, string>): string[] | Record<string, string> {
+  if (files.length && files.every((f) => notes[f])) {
+    const byNote: Record<string, string> = {}
+    for (const f of files) byNote[notes[f]] = f
+    return byNote
+  }
+  return files
+}
+
+/**
  * Renders a strudel.json document from the in-memory index. Nothing is stored;
  * every request reflects the current library, sources, and UI store.
  */
-export function renderManifest(cfg: Config, sounds: Sounds, packs: Pack[], view?: View): Record<string, unknown> {
+export function renderManifest(
+  cfg: Config,
+  sounds: Sounds,
+  packs: Pack[],
+  notes: Record<string, string>,
+  view?: View,
+): Record<string, unknown> {
   const doc: Record<string, unknown> = { _base: cfg.baseUrl }
 
   if (!view) {
-    for (const [name, files] of Object.entries(sounds)) doc[name] = files
-    for (const p of packs) doc[p.name] = p.files
+    for (const [name, files] of Object.entries(sounds)) doc[name] = renderEntry(files, notes)
+    for (const p of packs) doc[p.name] = renderEntry(p.files, notes)
     return doc
   }
 
@@ -19,7 +41,7 @@ export function renderManifest(cfg: Config, sounds: Sounds, packs: Pack[], view?
     const files = sounds[name] ?? byPack.get(name)
     // A view can outlive the sound it names — a renamed folder, a removed
     // source. Skip quietly rather than emitting a broken entry.
-    if (files) doc[name] = files
+    if (files) doc[name] = renderEntry(files, notes)
   }
   return doc
 }

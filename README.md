@@ -205,6 +205,24 @@ whichever view is selected.
 Views are references, not copies. Rename a folder and the view quietly drops the
 sound it can no longer find rather than emitting a broken entry.
 
+### Pitch
+
+By default a sound plays by index — `s("moog:0")`. If you type a note (`g3`,
+`bb3`, `cs4`, …) into the small box next to a file — in the file list or on a
+pack chip — samplevault switches that sound over to Strudel's
+[note-map form](https://strudel.cc/learn/samples/#specifying-pitch) once every
+file in it has one, so it plays in tune:
+
+```javascript
+note("g3 [bb3 c4]").s("moog")
+```
+
+A note is intrinsic to the file, not the sound name — `PUT /api/notes` stores
+it keyed by file path, so a file dragged into a pack keeps its pitch and the
+pack renders as a note-map too, no re-entering required. A sound with only
+some of its files noted keeps rendering as a plain array until the rest catch
+up, since Strudel does not support mixing the two forms in one entry.
+
 ### Renaming
 
 Name overrides live in the UI store, keyed by folder path — so a generated
@@ -315,6 +333,7 @@ Reached at `/samples/api/` through nginx.
 | `GET /api/health` | `{ ok, base, readOnly, builtAt }` |
 | `GET/PUT /api/views`, `DELETE /api/views/:name` | saved views |
 | `GET/PUT /api/names` | folder-path to sound-name overrides |
+| `GET/PUT /api/notes` | file-path to pitch overrides (see [Pitch](#pitch)) |
 | `GET/PUT /api/sources`, `DELETE /api/sources/:id` | remote repo definitions |
 | `POST /api/sources/preview` | resolve a candidate repo without saving it |
 | `GET /api/sources` | resolved remote sources and the sound names each contributed |

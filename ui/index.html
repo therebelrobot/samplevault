@@ -157,7 +157,7 @@
   .hint { color: var(--mute); font-size: 12px; margin: 0 0 12px; overflow-wrap: anywhere; }
 
   .row {
-    display: grid; grid-template-columns: 34px minmax(0, 1fr) 108px 52px 32px;
+    display: grid; grid-template-columns: 34px minmax(0, 1fr) 108px 52px 54px 32px;
     gap: 10px; align-items: center; width: 100%;
     padding: 6px 4px; border: 0; border-bottom: 1px solid var(--edge);
     background: none; text-align: left; cursor: pointer;
@@ -166,13 +166,18 @@
   .row .idx { color: var(--flag); font-weight: 700; font-size: 12px; }
   .row .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
   .row .dur { color: var(--mute); font-size: 12px; text-align: right; }
+  .row .note-in {
+    width: 100%; background: var(--paper-2); border: 1px solid var(--edge); border-radius: 2px;
+    padding: 3px 5px; font-size: 11px; text-align: center; cursor: text;
+  }
+  .row .note-in:not(:placeholder-shown) { border-color: var(--flag); color: var(--flag); }
   .row .add {
     border: 1px solid var(--edge); border-radius: 2px; background: none;
     text-align: center; padding: 3px 0; font-weight: 700; cursor: pointer;
   }
   .row .add:hover { border-color: var(--flag); color: var(--flag); }
   @media (max-width: 620px) {
-    .row { grid-template-columns: 30px minmax(0, 1fr) 44px 30px; }
+    .row { grid-template-columns: 30px minmax(0, 1fr) 44px 44px 30px; }
     .row .wave { display: none; }
   }
   .wave { display: block; width: 108px; height: 22px; }
@@ -249,6 +254,11 @@
   .chip:last-child { border-right-width: 1px; }
   .chip .slot { color: var(--flag); font-weight: 700; font-size: 11px; }
   .chip .who { font-size: 11px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .note-in {
+    width: 100%; margin-top: 3px; background: var(--paper); border: 1px solid var(--edge); border-radius: 2px;
+    padding: 2px 4px; font-size: 11px; text-align: center;
+  }
+  .chip .note-in:not(:placeholder-shown) { border-color: var(--flag); color: var(--flag); }
   .chip .tools { display: flex; gap: 2px; margin-top: 3px; }
   .chip .tools button {
     flex: 1; font-size: 11px; line-height: 1; padding: 3px 0; border-radius: 2px;
@@ -329,6 +339,7 @@ const state = {
   origin: {},
   sources: [],
   views: [],
+  notes: {},            // file path -> note, e.g. "moog/g3.wav" -> "g3"
   starred: new Set(),
   current: null,
   cued: 0,
@@ -482,6 +493,12 @@ function renderPane() {
 
   const files = state.sounds[state.current] ?? []
   const via = state.origin[state.current]
+  const noted = files.filter((f) => state.notes[f]).length
+  const pitchHint = !files.length ? '' : noted === files.length
+    ? `Every file has a note — plays via <code>note("...").s("${esc(state.current)}")</code>, picking the closest match.`
+    : noted
+      ? `${noted}/${files.length} file(s) have a note — give the rest one to switch this sound to pitch mode.`
+      : ''
 
   $('pane').innerHTML = `
     <div class="sound-title">
@@ -491,18 +508,20 @@ function renderPane() {
       <button class="btn tiny" id="addall">Add all to pack</button>
     </div>
     <p class="hint">Use as <code>s("${esc(state.current)}:0")</code> … <code>:${files.length - 1}</code> — click a row to hear it.</p>
+    ${pitchHint ? `<p class="hint">${pitchHint}</p>` : ''}
     <div id="filelist">${files.map((path, i) => rowHtml(path, i)).join('')}</div>`
 }
 
 function rowHtml(path, i) {
   const buf = buffers.get(path)
-  return `<button class="row${i === state.cued ? ' is-cued' : ''}" data-path="${esc(path)}" data-i="${i}">
+  return `<div class="row${i === state.cued ? ' is-cued' : ''}" data-path="${esc(path)}" data-i="${i}" role="button" tabindex="0">
     <span class="idx">:${i}</span>
     <span class="fname" title="${esc(path)}">${esc(path.split('/').pop())}</span>
     ${buf ? waveSvg(buf) : '<svg class="wave pending" viewBox="0 0 108 22" aria-hidden="true"><rect x="0" y="10.5" width="108" height="1"/></svg>'}
     <span class="dur">${buf ? buf.duration.toFixed(2) + 's' : ''}</span>
+    <input class="note-in" value="${esc(state.notes[path] || '')}" placeholder="note" spellcheck="false" autocomplete="off" ${state.apiUp ? '' : 'disabled'} title="Pitch this file, e.g. g3 — for note(...).s(...)">
     <span class="add" data-add="${i}" role="button" tabindex="-1" title="Add to pack">+</span>
-  </button>`
+  </div>`
 }
 
 function renderGuide() {
@@ -522,6 +541,11 @@ function renderGuide() {
         <li>
           <b>Build a pack</b>
           <p>Press <b>+</b> on the files you want, in the order you want them. They become <b>:0 :1 :2</b> — a pack is just a hand-picked set of files that can pull from any folder, local or remote.</p>
+        </li>
+        <li>
+          <b>Optional: give files a pitch</b>
+          <p>Type a note like <b>g3</b> or <b>cs4</b> into the small box next to a file (or a pack chip) to declare its pitch. Once every file in a sound or pack has one, it switches from index-based <b>:0 :1</b> to Strudel's note-map form, so <b>note(...)</b> picks the closest matching sample.</p>
+          <code>note("g3 [bb3 c4]").s("moog")</code>
         </li>
         <li>
           <b>Add it to the library</b>
@@ -651,6 +675,7 @@ function renderPack() {
     <div class="chip">
       <div class="slot">:${i}</div>
       <div class="who" title="${esc(item.path)}">${item.path.startsWith('remote/') ? '<span class="via">↗</span> ' : ''}${esc(item.path.split('/').pop())}</div>
+      <input class="note-in" data-chip="${i}" value="${esc(state.notes[item.path] || '')}" placeholder="note" spellcheck="false" autocomplete="off" ${state.apiUp ? '' : 'disabled'} title="Pitch this file, e.g. g3 — for note(...).s(...)">
       <div class="tools">
         <button data-move="${i}" data-dir="-1" title="Move earlier" ${i === 0 ? 'disabled' : ''}>◀</button>
         <button data-cue="${i}" title="Play">▸</button>
@@ -670,8 +695,15 @@ function packName() {
 }
 
 function packSnippet() {
+  const name = packName()
+  const pitched = state.pack.length > 0 && state.pack.every((p) => state.notes[p.path])
+  if (pitched) {
+    const entries = state.pack.map((p) => `    "${state.notes[p.path]}": "${p.path}"`).join(',\n')
+    const first = state.notes[state.pack[0].path]
+    return `samples({\n  ${name}: {\n${entries}\n  }\n}, "${state.base}")\n\n// note("${first} ...").s("${name}")`
+  }
   const files = state.pack.map((p) => `    "${p.path}"`).join(',\n')
-  return `samples({\n  ${packName()}: [\n${files}\n  ]\n}, "${state.base}")\n\n// s("${packName()}:0")`
+  return `samples({\n  ${name}: [\n${files}\n  ]\n}, "${state.base}")\n\n// s("${name}:0")`
 }
 
 function addToPack(i) {
@@ -685,6 +717,32 @@ function addToPack(i) {
 function say(msg, bad) {
   $('note').innerHTML = msg
   $('note').className = bad ? 'note bad' : 'note'
+}
+
+const NOTE_RE = /^[a-gA-G](s|f)*-?\d*$/
+
+/**
+ * Notes are keyed by file path, not sound or pack name — a file's pitch is
+ * intrinsic to it, so setting it here applies wherever that file is
+ * referenced. Rejection re-renders to snap the input back to the stored value.
+ */
+async function setNote(path, raw) {
+  const note = raw.trim().toLowerCase()
+  if (note && !NOTE_RE.test(note)) {
+    say(`"${esc(note)}" is not a note like g3, bb3, or cs4`, true)
+    return renderPane(), renderPack()
+  }
+  const next = { ...state.notes }
+  if (note) next[path] = note
+  else delete next[path]
+  const res = await fetch(`${API}/notes`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next),
+  })
+  const data = await res.json()
+  if (!res.ok) { say(`Rejected: ${esc((data.errors || []).join('; '))}`, true); return renderPane(), renderPack() }
+  state.notes = data
+  renderPane(); renderPack()
+  say(note ? `Set ${esc(path.split('/').pop())} to ${esc(note)}.` : `Cleared the note on ${esc(path.split('/').pop())}.`)
 }
 
 /* ---------- events ---------- */
@@ -713,6 +771,7 @@ $('soundlist').addEventListener('click', (e) => {
 })
 
 $('pane').addEventListener('click', async (e) => {
+  if (e.target.closest('.note-in')) return
   if (e.target.closest('#closesources')) { state.mode = state.current ? 'sound' : 'guide'; return renderPane() }
   if (e.target.closest('#cancelsrc')) return openSources()
 
@@ -765,7 +824,15 @@ $('pane').addEventListener('click', async (e) => {
   }
 })
 
+$('splice').addEventListener('change', async (e) => {
+  const noteIn = e.target.closest('.note-in')
+  if (!noteIn) return
+  const item = state.pack[Number(noteIn.dataset.chip)]
+  if (item) await setNote(item.path, noteIn.value)
+})
+
 $('splice').addEventListener('click', (e) => {
+  if (e.target.closest('.note-in')) return
   const mv = e.target.closest('[data-move]')
   if (mv) {
     const i = Number(mv.dataset.move), d = Number(mv.dataset.dir)
@@ -779,7 +846,13 @@ $('splice').addEventListener('click', (e) => {
   if (cue) void play(state.pack[Number(cue.dataset.cue)].path)
 })
 
-$('pane').addEventListener('change', (e) => {
+$('pane').addEventListener('change', async (e) => {
+  const noteIn = e.target.closest('.note-in')
+  if (noteIn) {
+    const row = noteIn.closest('[data-path]')
+    if (row) await setNote(row.dataset.path, noteIn.value)
+    return
+  }
   if (e.target.id !== 'f_type') return
   const gh = e.target.value === 'github'
   $('f_github').hidden = !gh
@@ -951,12 +1024,14 @@ async function boot() {
   state.origin = {}
   state.sources = []
   state.views = []
+  state.notes = {}
   try {
     const health = await fetch(`${API}/health`)
     state.apiUp = health.ok
     if (health.ok) {
       state.sources = await (await fetch(`${API}/sources`)).json()
       state.views = await (await fetch(`${API}/views`)).json()
+      state.notes = await (await fetch(`${API}/notes`)).json()
       for (const src of state.sources) for (const n of src.sounds) state.origin[n] = src.id
     }
   } catch { state.apiUp = false }

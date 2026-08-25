@@ -16,6 +16,9 @@ export type Sounds = Record<string, string[]>
 
 export const SAFE_NAME = /^[A-Za-z0-9_]+$/
 
+/** A Strudel note name: letter, optional sharp/flat marks, optional octave — e.g. g3, bb3, cs4, e. */
+export const SAFE_NOTE = /^[a-gA-G](s|f)*-?\d*$/
+
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 
 export const warnings: string[] = []

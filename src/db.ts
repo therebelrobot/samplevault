@@ -22,9 +22,11 @@ export interface DbShape {
   names: Record<string, string>
   /** Remote sample repos, managed from the UI. */
   sources: SourceDef[]
+  /** file path (relative to the samples root) -> note, e.g. "moog/005.wav" -> "g3" */
+  notes: Record<string, string>
 }
 
-const EMPTY: DbShape = { packs: [], views: [], names: {}, sources: [] }
+const EMPTY: DbShape = { packs: [], views: [], names: {}, sources: [], notes: {} }
 
 /**
  * The UI's store. Small, JSON, and deliberately separate from the sample
@@ -44,6 +46,7 @@ export class Db {
         views: Array.isArray(parsed.views) ? parsed.views : [],
         names: parsed.names && typeof parsed.names === 'object' ? parsed.names : {},
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+        notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {},
       }
     } catch (err) {
       const e = err as NodeJS.ErrnoException
@@ -63,6 +66,9 @@ export class Db {
   }
   get sources(): SourceDef[] {
     return this.data.sources
+  }
+  get notes(): Record<string, string> {
+    return this.data.notes
   }
 
   async update(fn: (d: DbShape) => void): Promise<void> {

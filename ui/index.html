@@ -296,7 +296,7 @@
   <nav class="rail" aria-label="Sounds">
     <div class="rail-head">
       <div class="filter">
-        <input id="filter" placeholder="Filter sounds  (/)" spellcheck="false" autocomplete="off">
+        <input id="filter" placeholder="Filter sounds or path  (/)" spellcheck="false" autocomplete="off">
         <button class="btn tiny" id="onlystar" aria-pressed="false" title="Show only starred">★</button>
       </div>
     </div>
@@ -440,7 +440,12 @@ function visibleNames() {
   const q = state.filter.toLowerCase()
   return Object.keys(state.sounds).filter((n) => {
     if (state.onlyStarred && !state.starred.has(n)) return false
-    return !q || n.toLowerCase().includes(q)
+    if (!q) return true
+    if (n.toLowerCase().includes(q)) return true
+    // The generated name drops repeated/deep path segments, so also match
+    // against each variant's full relative path to catch sounds the
+    // shortened name alone wouldn't surface.
+    return state.sounds[n].some((path) => path.toLowerCase().includes(q))
   })
 }
 
@@ -466,12 +471,16 @@ function renderSounds() {
         <span class="lbl">${esc(g.label)}</span>
         <span class="n">${g.names.length}</span>
       </button>
-      ${shut ? '' : g.names.map((name) => `
-        <button class="sound-btn" data-sound="${esc(name)}" aria-current="${name === state.current}" title="${esc(name)}">
+      ${shut ? '' : g.names.map((name) => {
+        const p0 = state.sounds[name][0]
+        const dir = p0.includes('/') ? p0.slice(0, p0.lastIndexOf('/')) : p0
+        return `
+        <button class="sound-btn" data-sound="${esc(name)}" aria-current="${name === state.current}" title="${esc(name)}  —  ${esc(dir)}">
           <span class="star" role="button" tabindex="-1" data-star="${esc(name)}" aria-pressed="${state.starred.has(name)}" title="Star for a view">${state.starred.has(name) ? '★' : '☆'}</span>
           <span class="nm">&#8206;${esc(name)}</span>
           <span class="count">${state.sounds[name].length}</span>
-        </button>`).join('')}`
+        </button>`
+      }).join('')}`
     })
     .join('')
 

@@ -21,7 +21,7 @@
     "predev": "node -e \"const fs=require('fs');if(!fs.existsSync('.env')){fs.copyFileSync('.env.example','.env');console.log('created .env from .env.example — edit it if needed')}\""
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.2.0",
     "esbuild": "^0.25.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"

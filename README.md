@@ -49,12 +49,12 @@ into. `.cache/` is the only thing samplevault puts on the samples volume, and
 <td><img src="docs/screenshots/view-saved.png" width="330"></td>
 </tr>
 <tr>
-<td align="center"><b>Publishing a namespaced pack</b></td>
-<td align="center"><b>A pack scoped to one view</b></td>
+<td align="center"><b>Scoping a pack to a view</b></td>
+<td align="center"><b>Managing packs</b></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/namespaced-pack-published.png" width="330"></td>
-<td><img src="docs/screenshots/namespaced-pack-scoped.png" width="330"></td>
+<td><img src="docs/screenshots/pack-scope-picker.png" width="330"></td>
+<td><img src="docs/screenshots/pack-manager.png" width="330"></td>
 </tr>
 <tr>
 <td align="center"><b>Phone</b></td>
@@ -250,13 +250,28 @@ whichever view is selected.
 Views are references, not copies. Rename a folder and the view quietly drops the
 sound it can no longer find rather than emitting a broken entry.
 
-**Namespaced packs.** A pack can be scoped to one view instead of published
-globally — the checkbox next to the pack name in the builder defaults to
-scoping it to whichever view is selected up top. A scoped pack belongs to that
-view automatically (no need to star it in), is invisible from the whole-library
-manifest and every other view, and may reuse a name already taken elsewhere —
-so `kit_a` and `kit_b` can each have their own `bd`/`hh`/`sd` without
-collisions. Deleting a view deletes its scoped packs with it.
+**Namespaced packs.** The dropdown to the left of the pack name says where a
+pack lives — `Global (whole library)`, or any one view. The two compose into
+the pack's identity the way a namespace does, `livemix/kick`, and a line under
+the bench spells out the consequence before you commit:
+
+```
+Pack  [ livemix ▾ ] / [ kick ]
+s("kick:0") · only inside livemix · hides the global kick inside that view
+```
+
+A scoped pack belongs to its view automatically (no need to star it in), never
+appears in the whole-library manifest or any other view, and may reuse a name
+that is already taken — so `kit_a` and `kit_b` can each have their own
+`bd`/`hh`/`sd`, and a scoped pack may deliberately shadow a folder sound of the
+same name. Selecting a view in the connect bar just pre-selects it here; the
+scope is always yours to change.
+
+**Packs…** in the sidebar footer lists every pack grouped by namespace, with
+duplicates disambiguated by a dimmed `view/` prefix. Each row re-scopes through
+its own dropdown, loads back into the bench for editing, or deletes. Moving a
+pack onto a name already taken in the destination is rejected rather than
+silently overwriting. Deleting a view deletes the packs scoped to it.
 
 ### Pitch
 

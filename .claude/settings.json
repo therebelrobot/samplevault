@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(playwright-cli close *)"
+      "Bash(playwright-cli close *)",
+      "WebSearch",
+      "WebFetch"
     ],
     "additionalDirectories": [
       "/Users/aster/git/therebelrobot/samplevault"

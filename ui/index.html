@@ -245,6 +245,28 @@
     background: var(--paper-2); border: 1px solid var(--edge); border-radius: 2px; padding: 5px 8px;
   }
   .bench-head input { width: 130px; }
+  /* Scope, slash, and name read as one identifier — kit_a/bd — the way npm and
+     GitHub compose a namespace with the name it qualifies. */
+  .bench-head .slash { color: var(--mute); margin: 0 -3px; }
+  .scopeline { font-size: 12px; color: var(--mute); margin: 6px 0 0; }
+  .scopeline code { background: var(--paper-2); padding: 1px 5px; color: var(--ink); }
+  .scopeline .warn { color: var(--flag); }
+
+  .rail-foot { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ---------- pack manager ---------- */
+
+  .pack-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
+    gap: 8px; align-items: center;
+    padding: 6px 4px; border-bottom: 1px solid var(--edge);
+  }
+  .pack-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  /* Dimmed prefix, so two packs both named "bd" never render identically. */
+  .pack-row .ns { color: var(--mute); }
+  .pack-row .count { color: var(--mute); font-size: 11px; }
+  .pack-row select { background: var(--paper-2); border: 1px solid var(--edge); border-radius: 2px; padding: 3px 5px; font-size: 11px; }
+  .pack-row .shadows { color: var(--flag); font-size: 10px; letter-spacing: 0.1em; }
 
   .splice { display: flex; overflow-x: auto; padding-bottom: 4px; }
   .chip {
@@ -302,6 +324,7 @@
     </div>
     <div class="rail-list" id="soundlist"></div>
     <div class="rail-foot">
+      <button class="btn tiny" id="managepacks">Packs…</button>
       <button class="btn tiny" id="managesources">Remote repos…</button>
     </div>
   </nav>
@@ -312,8 +335,9 @@
 <section class="bench" aria-label="Pack builder">
   <div class="bench-head">
     <span class="lede">Pack</span>
+    <select id="packscope" title="Where this pack lives"></select>
+    <span class="slash">/</span>
     <input id="packname" value="mypack" spellcheck="false" autocomplete="off">
-    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="packglobal"> <span id="packglobal-lbl">Global</span></label>
     <button class="btn" id="playpack">Play through</button>
     <button class="btn primary" id="publish">Add to library</button>
     <button class="btn" id="copypack">Copy as snippet</button>
@@ -323,6 +347,7 @@
     <button class="btn tiny" id="saveview">Save starred as view</button>
     <button class="btn tiny" id="delview">Delete view</button>
   </div>
+  <p class="scopeline" id="scopeline"></p>
   <div class="splice" id="splice"></div>
   <p class="empty" id="benchempty">Pick a sound on the left, then press <b>+</b> on the files you want. They become <b>:0 :1 :2</b> in order.</p>
   <p class="note" id="note"></p>
@@ -458,11 +483,40 @@ function applyScopedPacks() {
   }
 }
 
-function syncPackGlobal() {
-  const view = $('viewpick').value
-  $('packglobal').disabled = !view
-  $('packglobal').checked = !view
-  $('packglobal-lbl').textContent = view ? `Scope to "${view}"` : 'Global'
+/**
+ * "Global" is an option in this list rather than a checkbox beside it, so the
+ * control always answers the whole question on its own. Selecting a view up
+ * top only seeds it as a default — it never locks the choice.
+ */
+function renderPackScope(seed) {
+  const picked = seed !== undefined ? seed : $('packscope').value
+  $('packscope').innerHTML =
+    `<option value=""${picked ? '' : ' selected'}>Global (whole library)</option>` +
+    (state.views.length
+      ? `<optgroup label="scope to a view">${state.views
+          .map((v) => `<option value="${esc(v.name)}"${v.name === picked ? ' selected' : ''}>${esc(v.name)}</option>`)
+          .join('')}</optgroup>`
+      : '')
+  renderScopeLine()
+}
+
+/** Live preview of what publishing will produce, and what it would collide with. */
+function renderScopeLine() {
+  const name = packName()
+  const scope = $('packscope').value || null
+  const clash = state.packs.some((p) => p.name === name && (p.view ?? null) === scope)
+  const shadows = scope && (state.baseSounds[name] || state.packs.some((p) => p.name === name && !p.view))
+
+  const where = scope
+    ? `only inside <b>${esc(scope)}</b>`
+    : 'in every view'
+  const notes = [
+    clash ? '<span class="warn">replaces the pack already there</span>' : '',
+    shadows ? `<span class="warn">hides the global <b>${esc(name)}</b> inside that view</span>` : '',
+  ].filter(Boolean)
+
+  $('scopeline').innerHTML =
+    `<code>s("${esc(name)}:0")</code> · ${where}${notes.length ? ' · ' + notes.join(' · ') : ''}`
 }
 
 function visibleNames() {
@@ -506,7 +560,7 @@ function renderSounds() {
         return `
         <button class="sound-btn" data-sound="${esc(name)}" aria-current="${name === state.current}" title="${esc(name)}  —  ${esc(dir)}">
           ${state.packScope[name]
-            ? `<span class="star" title="Scoped to view &quot;${esc(state.packScope[name])}&quot; — belongs to it automatically">·</span>`
+            ? `<span class="star" role="button" tabindex="-1" data-packof="${esc(name)}" title="Pack scoped to &quot;${esc(state.packScope[name])}&quot; — open the pack manager">·</span>`
             : `<span class="star" role="button" tabindex="-1" data-star="${esc(name)}" aria-pressed="${state.starred.has(name)}" title="Star for a view">${state.starred.has(name) ? '★' : '☆'}</span>`}
           <span class="nm">&#8206;${esc(name)}</span>
           <span class="count">${state.sounds[name].length}</span>
@@ -529,6 +583,7 @@ function renderSounds() {
 
 function renderPane() {
   if (state.mode === 'sources') return renderSources()
+  if (state.mode === 'packs') return renderPacks()
   if (state.mode === 'guide' || !state.current) return renderGuide()
 
   const files = state.sounds[state.current] ?? []
@@ -593,6 +648,11 @@ function renderGuide() {
           <b>Add it to the library</b>
           <p>Name the pack at the bottom and press <b>Add to library</b>. It joins the manifest immediately, so the line you already pasted picks it up.</p>
           <code>s("mypack:0 mypack:1 ~ mypack:2")</code>
+        </li>
+        <li>
+          <b>Optional: give the pack its own namespace</b>
+          <p>The dropdown left of the pack name chooses where it lives — the whole library, or one view. A pack scoped to a view exists only inside it and can reuse a name that is already taken, so each view can have its own <b>bd</b>, <b>hh</b>, and <b>sd</b>. Press <b>Packs…</b> in the sidebar to re-scope, edit, or delete anything you have saved.</p>
+          <code>livemix/kick</code>
         </li>
         <li>
           <b>Optional: pull in a public repo</b>
@@ -680,6 +740,73 @@ function renderSources() {
             </button>`).join('')}
         </div>
       </div>` : ''}`
+}
+
+/* ---------- pack manager ---------- */
+
+/**
+ * Packs grouped by the namespace they live in, names rendered `kit_a/bd` so two
+ * packs sharing a name never render identically. Scope is a plain data field,
+ * not a position, so it changes through a select on the row rather than a drag.
+ */
+function renderPacks() {
+  const groups = [{ key: null, label: 'Global — in every view', packs: state.packs.filter((p) => !p.view) }]
+  for (const v of state.views) {
+    groups.push({ key: v.name, label: `${v.name} — only inside this view`, packs: state.packs.filter((p) => p.view === v.name) })
+  }
+  // A pack can outlive the view it named, and would otherwise be invisible here.
+  const orphans = state.packs.filter((p) => p.view && !state.views.some((v) => v.name === p.view))
+  if (orphans.length) groups.push({ key: '?', label: 'Scoped to a view that no longer exists', packs: orphans })
+
+  const opts = (cur) =>
+    `<option value=""${cur ? '' : ' selected'}>Global</option>` +
+    state.views.map((v) => `<option value="${esc(v.name)}"${v.name === cur ? ' selected' : ''}>${esc(v.name)}</option>`).join('')
+
+  $('pane').innerHTML = `
+    <div class="sound-title"><h2>Packs</h2>
+      <button class="btn tiny" id="closepacks">Back to library</button>
+    </div>
+    <p class="hint">A pack is a hand-picked, ordered set of files. Global packs appear everywhere; a pack scoped to a view exists only inside it and may reuse a name that is taken elsewhere.</p>
+
+    ${groups.filter((g) => g.packs.length).map((g) => `
+      <div class="src">
+        <h3>${esc(g.label)}</h3>
+        ${g.packs.map((p) => {
+          const shadowed = p.view && (state.baseSounds[p.name] || state.packs.some((o) => o.name === p.name && !o.view))
+          return `
+          <div class="pack-row">
+            <span class="nm" title="${esc(p.files.join('\n'))}">${p.view ? `<span class="ns">${esc(p.view)}/</span>` : ''}${esc(p.name)}
+              ${shadowed ? '<span class="shadows">HIDES GLOBAL</span>' : ''}</span>
+            <span class="count">${p.files.length} files</span>
+            <select data-rescope="${esc(p.name)}" data-from="${esc(p.view ?? '')}" title="Move this pack to another namespace">${opts(p.view ?? '')}</select>
+            <span>
+              <button class="btn tiny" data-loadpack="${esc(p.name)}" data-view="${esc(p.view ?? '')}">Load into bench</button>
+              <button class="btn tiny" data-delpack="${esc(p.name)}" data-view="${esc(p.view ?? '')}">Delete</button>
+            </span>
+          </div>`
+        }).join('')}
+      </div>`).join('')}
+
+    ${state.packs.length ? '' : '<p class="empty">No packs yet — build one at the bottom of the screen and press Add to library.</p>'}`
+}
+
+/** Every pack except the one identified, for the full-array PUT the API expects. */
+function packsExcept(name, view) {
+  return state.packs.filter((p) => !(p.name === name && (p.view ?? null) === (view || null)))
+}
+
+async function putPacks(body, ok) {
+  const res = await fetch(`${API}/packs`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
+    return false
+  }
+  await boot() // re-renders the manager too, when that's the open pane
+  say(ok)
+  return true
 }
 
 function formDef() {
@@ -797,6 +924,12 @@ $('soundlist').addEventListener('click', (e) => {
     saveCollapsed()
     return renderSounds()
   }
+  const packof = e.target.closest('[data-packof]')
+  if (packof) {
+    e.stopPropagation()
+    state.mode = 'packs'
+    return renderPane()
+  }
   const star = e.target.closest('[data-star]')
   if (star) {
     e.stopPropagation()
@@ -814,8 +947,37 @@ $('soundlist').addEventListener('click', (e) => {
 
 $('pane').addEventListener('click', async (e) => {
   if (e.target.closest('.note-in')) return
-  if (e.target.closest('#closesources')) { state.mode = state.current ? 'sound' : 'guide'; return renderPane() }
+  if (e.target.closest('#closesources') || e.target.closest('#closepacks')) {
+    state.mode = state.current ? 'sound' : 'guide'
+    return renderPane()
+  }
   if (e.target.closest('#cancelsrc')) return openSources()
+
+  const loadp = e.target.closest('[data-loadpack]')
+  if (loadp) {
+    const { loadpack, view } = loadp.dataset
+    const pack = state.packs.find((p) => p.name === loadpack && (p.view ?? '') === view)
+    if (!pack) return
+    state.pack = pack.files.map((path) => ({ path }))
+    $('packname').value = pack.name
+    renderPackScope(pack.view ?? '')
+    renderPack()
+    state.mode = state.current ? 'sound' : 'guide'
+    renderPane()
+    return say(`Loaded <code>${esc(pack.name)}</code> into the bench — edit it below, then Add to library to save over it.`)
+  }
+
+  const delp = e.target.closest('[data-delpack]')
+  if (delp) {
+    const { delpack, view } = delp.dataset
+    const label = view ? `${view}/${delpack}` : delpack
+    if (!confirm(`Delete pack "${label}"? The files stay in the library; only the pack goes.`)) return
+    const q = view ? `?view=${encodeURIComponent(view)}` : ''
+    const res = await fetch(`${API}/packs/${encodeURIComponent(delpack)}${q}`, { method: 'DELETE' })
+    if (!res.ok) return say('Could not delete that pack.', true)
+    await boot()
+    return say(`Deleted <code>${esc(label)}</code>.`)
+  }
 
   const edit = e.target.closest('[data-editsrc]')
   if (edit) {
@@ -895,6 +1057,22 @@ $('pane').addEventListener('change', async (e) => {
     if (row) await setNote(row.dataset.path, noteIn.value)
     return
   }
+
+  const rescope = e.target.closest('[data-rescope]')
+  if (rescope) {
+    const name = rescope.dataset.rescope
+    const from = rescope.dataset.from
+    const to = rescope.value
+    const moved = { ...state.packs.find((p) => p.name === name && (p.view ?? '') === from), view: to || null }
+    const ok = await putPacks(
+      packsExcept(name, from).concat(moved),
+      `Moved <code>${esc(name)}</code> to ${to ? `<b>${esc(to)}</b>` : 'the whole library'}.`,
+    )
+    // A rejected move leaves the select showing the new value — re-render so it
+    // snaps back to where the pack actually still is.
+    if (!ok) renderPacks()
+    return
+  }
   if (e.target.id !== 'f_type') return
   const gh = e.target.value === 'github'
   $('f_github').hidden = !gh
@@ -911,11 +1089,16 @@ $('onlystar').addEventListener('click', () => {
 
 $('help').addEventListener('click', () => { state.mode = 'guide'; renderPane() })
 $('managesources').addEventListener('click', () => openSources())
+$('managepacks').addEventListener('click', () => { state.mode = 'packs'; renderPane() })
+$('packscope').addEventListener('change', renderScopeLine)
+$('packname').addEventListener('input', renderScopeLine)
 $('viewpick').addEventListener('change', () => {
   const view = state.views.find((v) => v.name === $('viewpick').value)
   if (view) { state.starred = new Set(view.sounds); $('viewname').value = view.name }
   applyScopedPacks()
-  syncPackGlobal()
+  // Seed the pack scope to match, as a convenience — the user can still send
+  // the next pack anywhere from the bench's own control.
+  renderPackScope($('viewpick').value)
   if (state.current && !state.sounds[state.current]) state.current = null
   renderConnect(); renderSounds(); renderPane()
   say(view ? `Loaded view "${esc(view.name)}" — ${view.sounds.length} sounds starred.` : '')
@@ -927,21 +1110,14 @@ $('playpack').addEventListener('click', () => void playPack())
 $('clear').addEventListener('click', () => { state.pack = []; renderPack(); say('Pack cleared.') })
 
 $('publish').addEventListener('click', async () => {
-  const existing = await (await fetch(`${API}/packs`)).json()
   const name = packName()
-  const view = $('packglobal').checked || !$('viewpick').value ? null : $('viewpick').value
-  const body = existing
-    .filter((p) => !(p.name === name && (p.view ?? null) === view))
-    .concat({ name, files: state.pack.map((p) => p.path), view })
-  const res = await fetch(`${API}/packs`, {
-    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
-  say(view
-    ? `Added to view "${esc(view)}" — use it now there with <code>s("${esc(name)}:0")</code>`
-    : `Added — use it now with <code>s("${esc(name)}:0")</code>`)
-  await boot()
+  const view = $('packscope').value || null
+  await putPacks(
+    packsExcept(name, view).concat({ name, files: state.pack.map((p) => p.path), view }),
+    view
+      ? `Added to <b>${esc(view)}</b> — use it there with <code>s("${esc(name)}:0")</code>`
+      : `Added — use it now with <code>s("${esc(name)}:0")</code>`,
+  )
 })
 
 $('saveview').addEventListener('click', async () => {
@@ -1066,6 +1242,9 @@ function renderViews() {
   const picked = $('viewpick').value
   $('viewpick').innerHTML = '<option value="">Whole library</option>' +
     state.views.map((v) => `<option value="${esc(v.name)}"${v.name === picked ? ' selected' : ''}>${esc(v.name)} — ${v.sounds.length} sounds</option>`).join('')
+  // The bench's scope list is the same set of views — refresh it here so a view
+  // saved a moment ago is immediately available to scope the next pack into.
+  renderPackScope()
 }
 
 async function boot() {
@@ -1094,9 +1273,8 @@ async function boot() {
   } catch { state.apiUp = false }
 
   $('refresh').hidden = !state.apiUp
-  renderViews()
+  renderViews() // also refreshes the bench scope list
   applyScopedPacks()
-  syncPackGlobal()
   if (state.current && !state.sounds[state.current]) state.current = null
 
   renderConnect(); renderSounds(); renderPane(); renderPack()

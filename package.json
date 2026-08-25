@@ -23,7 +23,7 @@
     "@types/node": "^24.0.0",
     "esbuild": "^0.25.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^7.0.2"
   },
   "description": "Sample library, auditioning UI, and ephemeral pack builder for Strudel — companion to patternvault"
 }

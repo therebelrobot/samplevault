@@ -719,7 +719,7 @@ function say(msg, bad) {
   $('note').className = bad ? 'note bad' : 'note'
 }
 
-const NOTE_RE = /^[a-gA-G](s|f)*-?\d*$/
+const NOTE_RE = /^[a-gA-G](s|b)*-?\d*$/
 
 /**
  * Notes are keyed by file path, not sound or pack name — a file's pitch is
@@ -1019,7 +1019,9 @@ async function boot() {
   const doc = await (await fetch(MANIFEST_URL, { cache: 'no-store' })).json()
   state.base = doc._base || ''
   state.sounds = {}
-  for (const [k, v] of Object.entries(doc)) if (k !== '_base') state.sounds[k] = v
+  // A fully pitch-noted sound renders in strudel.json as a note -> file map (for Strudel
+  // to consume), not a plain array. The UI always works with a flat file list here.
+  for (const [k, v] of Object.entries(doc)) if (k !== '_base') state.sounds[k] = Array.isArray(v) ? v : Object.values(v)
 
   state.origin = {}
   state.sources = []

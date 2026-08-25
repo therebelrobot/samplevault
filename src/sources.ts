@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import type { Config, Sounds } from './scan'
 import { SAFE_NAME, soundName } from './scan'
@@ -122,8 +123,16 @@ export async function resolveSources(
   return out
 }
 
+/** Ties the cache to what actually determines the resolved sounds, not just the id — so
+ *  editing a source's repo/ref/path/url/prefix invalidates the old cache instead of
+ *  silently serving stale results until the TTL expires or someone clicks Rescan. */
+function fingerprint(def: SourceDef): string {
+  const key = JSON.stringify([def.type, def.repo, def.ref, def.path, def.url, def.prefix])
+  return createHash('sha1').update(key).digest('hex').slice(0, 12)
+}
+
 async function resolveOne(cfg: Config, def: SourceDef, ttlMs: number, force: boolean): Promise<RemoteSource> {
-  const cacheFile = join(cfg.cacheDir, `index-${def.id}.json`)
+  const cacheFile = join(cfg.cacheDir, `index-${def.id}-${fingerprint(def)}.json`)
 
   if (!force) {
     try {

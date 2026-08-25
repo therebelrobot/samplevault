@@ -29,6 +29,43 @@ into. `.cache/` is the only thing samplevault puts on the samples volume, and
 
 ---
 
+## Screenshots
+
+<table>
+<tr>
+<td align="center"><b>Auditioning</b></td>
+<td align="center"><b>Building a pack</b></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/waveform-playing.png" width="330"></td>
+<td><img src="docs/screenshots/pack-builder.png" width="330"></td>
+</tr>
+<tr>
+<td align="center"><b>Adding a remote repo</b></td>
+<td align="center"><b>Publishing a pack and view</b></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/remote-repos.png" width="330"></td>
+<td><img src="docs/screenshots/view-saved.png" width="330"></td>
+</tr>
+<tr>
+<td align="center"><b>Phone</b></td>
+<td align="center"><b>Dark mode</b></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/mobile-sound.png" width="180"></td>
+<td><img src="docs/screenshots/dark-mode.png" width="330"></td>
+</tr>
+</table>
+
+Every screen and state — empty pitch, rejected input, a folder rename, a
+starred filter, a rescan in progress — is in
+[docs/screenshots/](docs/screenshots/). Regenerate the whole set anytime with
+`npm run screenshots`; it drives the UI against a throwaway sample library, so
+it never touches your real one.
+
+---
+
 ## Quickstart
 
 Nothing to build — both images are published on GHCR. Make a directory, drop in
@@ -403,7 +440,9 @@ Two images ship from this repo:
 To develop the UI against published images, uncomment the two bind mounts under
 `samplevault-web` in `docker-compose.yml` — they override the baked-in copies.
 
-Also: `docker:run`, `release:patch|minor|major`, `release:tags`.
+Also: `docker:run`, `release:patch|minor|major`, `release:tags`, and `npm run
+screenshots` — regenerates every image under [docs/screenshots/](docs/screenshots/)
+from a throwaway sample library (see [Screenshots](#screenshots) above).
 
 ### Releasing
 

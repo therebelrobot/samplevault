@@ -7,3 +7,10 @@ samples/
 .DS_Store
 data/
 .vscode
+
+# Throwaway fixture library for scripts/capture-screenshots.sh
+.screenshot-fixtures/
+.screenshot-fixtures.log
+
+# playwright-cli session snapshots/logs
+.playwright-cli/

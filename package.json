@@ -8,6 +8,7 @@
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/server.js",
     "typecheck": "tsc --noEmit",
+    "screenshots": "bash scripts/capture-screenshots.sh",
     "docker:build": "docker build -t ghcr.io/therebelrobot/samplevault:local .",
     "docker:run": "docker run --rm -p 3012:3012 -v $(pwd)/samples:/srv/samples ghcr.io/therebelrobot/samplevault:local",
     "docker:push": "docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/therebelrobot/samplevault:latest --push .",

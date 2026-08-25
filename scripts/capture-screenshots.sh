@@ -154,7 +154,7 @@ run "
   await page.locator('#publish').click();
   await page.waitForTimeout(400);
 "
-shot namespaced-pack-published
+shot pack-scoped-published
 
 # A second view gets its own `kick` under the same name — the whole point of
 # namespacing — then the manager shows both, disambiguated by a dimmed `view/`

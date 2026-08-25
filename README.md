@@ -7,6 +7,10 @@ the sounds they reach for.
 Indexes your own folders *and* public sample repos, proxying the remote ones so a
 pack can freely mix a vocal one-shot off your NAS with a kick from Dirt-Samples.
 
+Packs can be namespaced to a view, so every set you build gets its own
+`bd`/`hh`/`sd` under the short names you actually want to type — no globally
+unique naming, no collisions between kits.
+
 Two containers:
 
 | Service | Image | Port | Job |

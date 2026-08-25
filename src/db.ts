@@ -5,6 +5,8 @@ import type { SourceDef } from './sources'
 export interface Pack {
   name: string
   files: string[]
+  /** View this pack is namespaced to, or null for a pack visible everywhere. */
+  view: string | null
   published: string
 }
 

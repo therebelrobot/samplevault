@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(playwright-cli close *)"
+    ],
+    "additionalDirectories": [
+      "/Users/aster/git/therebelrobot/samplevault"
+    ]
+  }
+}

@@ -183,9 +183,12 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
 
   if (req.method === 'DELETE' && path.startsWith('/api/packs/')) {
     const name = decodeURIComponent(path.slice('/api/packs/'.length))
-    if (!db.packs.some((p) => p.name === name)) return json(res, 404, { error: `no pack named "${name}"` })
+    const view = url.searchParams.get('view')
+    if (!db.packs.some((p) => p.name === name && (p.view ?? null) === view)) {
+      return json(res, 404, { error: `no pack named "${name}"${view ? ` in view "${view}"` : ''}` })
+    }
     await db.update((d) => {
-      d.packs = d.packs.filter((p) => p.name !== name)
+      d.packs = d.packs.filter((p) => !(p.name === name && (p.view ?? null) === view))
     })
     return json(res, 200, db.packs)
   }
@@ -205,6 +208,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: ServerDep
     if (!db.views.some((v) => v.name === name)) return json(res, 404, { error: `no view named "${name}"` })
     await db.update((d) => {
       d.views = d.views.filter((v) => v.name !== name)
+      // Packs namespaced to this view have nowhere left to render — drop them
+      // rather than leaving them to silently reattach if the name is reused.
+      d.packs = d.packs.filter((p) => p.view !== name)
     })
     return json(res, 200, db.views)
   }

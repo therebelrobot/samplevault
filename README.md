@@ -49,6 +49,14 @@ into. `.cache/` is the only thing samplevault puts on the samples volume, and
 <td><img src="docs/screenshots/view-saved.png" width="330"></td>
 </tr>
 <tr>
+<td align="center"><b>Publishing a namespaced pack</b></td>
+<td align="center"><b>A pack scoped to one view</b></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/namespaced-pack-published.png" width="330"></td>
+<td><img src="docs/screenshots/namespaced-pack-scoped.png" width="330"></td>
+</tr>
+<tr>
 <td align="center"><b>Phone</b></td>
 <td align="center"><b>Dark mode</b></td>
 </tr>
@@ -242,6 +250,14 @@ whichever view is selected.
 Views are references, not copies. Rename a folder and the view quietly drops the
 sound it can no longer find rather than emitting a broken entry.
 
+**Namespaced packs.** A pack can be scoped to one view instead of published
+globally — the checkbox next to the pack name in the builder defaults to
+scoping it to whichever view is selected up top. A scoped pack belongs to that
+view automatically (no need to star it in), is invisible from the whole-library
+manifest and every other view, and may reuse a name already taken elsewhere —
+so `kit_a` and `kit_b` can each have their own `bd`/`hh`/`sd` without
+collisions. Deleting a view deletes its scoped packs with it.
+
 ### Pitch
 
 By default a sound plays by index — `s("moog:0")`. If you type a note (`g3`,
@@ -271,7 +287,7 @@ Two ways out of the pack builder:
 | | What happens | Persistence |
 | --- | --- | --- |
 | **Copy snippet** | `samples({ name: [...] }, base)` on your clipboard | localStorage only — truly ephemeral |
-| **Publish** | written to the UI store, merged into every manifest | permanent; `s("mix1:0")` works in any pattern |
+| **Publish** | written to the UI store, merged into every manifest (or scoped to one view — see [Namespaced packs](#views)) | permanent; `s("mix1:0")` works in any pattern |
 
 Publish hides itself when the API is unreachable. `READ_ONLY=1` serves manifests
 and audio normally but rejects every write, which is the mode to use if you ever
@@ -378,12 +394,16 @@ Reached at `/samples/api/` through nginx.
 | `GET /api/remote/:id/*` | proxies one remote file, caching it to disk |
 | `GET /api/packs` | published packs |
 | `PUT /api/packs` | replaces all packs (validated), rewrites the manifest |
-| `DELETE /api/packs/:name` | removes one pack, rewrites the manifest |
+| `DELETE /api/packs/:name`, optional `?view=` | removes one pack, rewrites the manifest — without `?view=` this only touches the global pack of that name, leaving any view-scoped pack sharing the name alone |
 
-A pack is rejected with `422` if its name is outside `[A-Za-z0-9_]`, collides
-with a folder-derived sound, is listed twice, has no files, or references a file
-that is not in the library. Validation runs before the write, so `strudel.json`
-can never point at a missing file.
+A pack is rejected with `422` if its name is outside `[A-Za-z0-9_]`, is listed
+twice within the same scope, has no files, or references a file that is not in
+the library. A *global* pack (no `view`) is also rejected if its name collides
+with a folder-derived sound — a pack scoped to a view is allowed to shadow one,
+since that's the whole point of namespacing it (see [Namespaced
+packs](#views)). Validation runs before the write, so `strudel.json` can never
+point at a missing file. Deleting a view (`DELETE /api/views/:name`) cascades
+to delete every pack scoped to it.
 
 ```bash
 curl -X PUT https://strudel.example.com/samples/api/packs \

@@ -134,6 +134,30 @@ run "
 "
 shot view-saved
 
+# ─── Namespaced packs: a pack scoped to one view, reusing a name (`kick`)
+# already taken by a real folder — proves the point of scoping rather than
+# picking an unrelated name.
+run "
+  await page.locator('#onlystar').click();
+  await page.locator('#viewpick').selectOption(['livemix']);
+"
+shot pack-scope-checkbox
+
+run "
+  await page.locator('[data-sound=\"snare\"]').click();
+  await page.locator('[data-path=\"snare/snare_1.wav\"] .add').click();
+  await page.locator('[data-sound=\"vox\"]').click();
+  await page.locator('[data-path=\"vox/oh_2.wav\"] .add').click();
+  await page.locator('[data-path=\"vox/oh_10.wav\"] .add').click();
+  await page.locator('#packname').fill('kick');
+  await page.locator('#publish').click();
+  await page.waitForTimeout(300);
+"
+shot namespaced-pack-published
+
+run "await page.locator('[data-sound=\"kick\"]').click();"
+shot namespaced-pack-scoped
+
 run "await page.locator('#copyurl').click();"
 shot copy-manifest-url
 

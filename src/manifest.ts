@@ -29,19 +29,23 @@ export function renderManifest(
   view?: View,
 ): Record<string, unknown> {
   const doc: Record<string, unknown> = { _base: cfg.baseUrl }
+  const globalPacks = packs.filter((p) => !p.view)
 
   if (!view) {
     for (const [name, files] of Object.entries(sounds)) doc[name] = renderEntry(files, notes)
-    for (const p of packs) doc[p.name] = renderEntry(p.files, notes)
+    for (const p of globalPacks) doc[p.name] = renderEntry(p.files, notes)
     return doc
   }
 
-  const byPack = new Map(packs.map((p) => [p.name, p.files]))
+  const byPack = new Map(globalPacks.map((p) => [p.name, p.files]))
   for (const name of view.sounds) {
     const files = sounds[name] ?? byPack.get(name)
     // A view can outlive the sound it names — a renamed folder, a removed
     // source. Skip quietly rather than emitting a broken entry.
     if (files) doc[name] = renderEntry(files, notes)
   }
+  // Packs scoped to this view are intrinsic to it — no need to list them in
+  // `sounds` — and take priority over anything already resolved above.
+  for (const p of packs) if (p.view === view.name) doc[p.name] = renderEntry(p.files, notes)
   return doc
 }

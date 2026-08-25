@@ -313,6 +313,7 @@
   <div class="bench-head">
     <span class="lede">Pack</span>
     <input id="packname" value="mypack" spellcheck="false" autocomplete="off">
+    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="packglobal"> <span id="packglobal-lbl">Global</span></label>
     <button class="btn" id="playpack">Play through</button>
     <button class="btn primary" id="publish">Add to library</button>
     <button class="btn" id="copypack">Copy as snippet</button>
@@ -335,7 +336,10 @@ const STORE = 'samplevault:pack'
 
 const state = {
   base: '',
-  sounds: {},
+  baseSounds: {},        // whole-library sounds + global packs, from strudel.json
+  sounds: {},            // baseSounds plus whichever view's scoped packs are active
+  packs: [],             // raw GET /api/packs — every pack, any scope
+  packScope: {},         // sound name -> view, for entries overlaid from a scoped pack
   origin: {},
   sources: [],
   views: [],
@@ -436,6 +440,31 @@ function renderConnect() {
 
 /* ---------- rail ---------- */
 
+/**
+ * Packs scoped to a view are excluded from the whole-library manifest (so
+ * they don't collide with a same-named pack in another view), so they only
+ * become visible/audition-able in the rail while their view is the one
+ * selected up top.
+ */
+function applyScopedPacks() {
+  const chosen = $('viewpick').value
+  state.sounds = { ...state.baseSounds }
+  state.packScope = {}
+  for (const p of state.packs) {
+    if (chosen && p.view === chosen) {
+      state.sounds[p.name] = p.files
+      state.packScope[p.name] = p.view
+    }
+  }
+}
+
+function syncPackGlobal() {
+  const view = $('viewpick').value
+  $('packglobal').disabled = !view
+  $('packglobal').checked = !view
+  $('packglobal-lbl').textContent = view ? `Scope to "${view}"` : 'Global'
+}
+
 function visibleNames() {
   const q = state.filter.toLowerCase()
   return Object.keys(state.sounds).filter((n) => {
@@ -476,7 +505,9 @@ function renderSounds() {
         const dir = p0.includes('/') ? p0.slice(0, p0.lastIndexOf('/')) : p0
         return `
         <button class="sound-btn" data-sound="${esc(name)}" aria-current="${name === state.current}" title="${esc(name)}  —  ${esc(dir)}">
-          <span class="star" role="button" tabindex="-1" data-star="${esc(name)}" aria-pressed="${state.starred.has(name)}" title="Star for a view">${state.starred.has(name) ? '★' : '☆'}</span>
+          ${state.packScope[name]
+            ? `<span class="star" title="Scoped to view &quot;${esc(state.packScope[name])}&quot; — belongs to it automatically">·</span>`
+            : `<span class="star" role="button" tabindex="-1" data-star="${esc(name)}" aria-pressed="${state.starred.has(name)}" title="Star for a view">${state.starred.has(name) ? '★' : '☆'}</span>`}
           <span class="nm">&#8206;${esc(name)}</span>
           <span class="count">${state.sounds[name].length}</span>
         </button>`
@@ -502,6 +533,7 @@ function renderPane() {
 
   const files = state.sounds[state.current] ?? []
   const via = state.origin[state.current]
+  const scope = state.packScope[state.current]
   const noted = files.filter((f) => state.notes[f]).length
   const pitchHint = !files.length ? '' : noted === files.length
     ? `Every file has a note — plays via <code>note("...").s("${esc(state.current)}")</code>, picking the closest match.`
@@ -513,7 +545,8 @@ function renderPane() {
     <div class="sound-title">
       <h2>${esc(state.current)}</h2>
       ${via ? `<span class="via">via ${esc(via)} ↗</span>` : ''}
-      ${!via && state.apiUp ? '<button class="btn tiny" id="rename">Rename</button>' : ''}
+      ${scope ? `<span class="via">scoped to "${esc(scope)}"</span>` : ''}
+      ${!via && !scope && state.apiUp ? '<button class="btn tiny" id="rename">Rename</button>' : ''}
       <button class="btn tiny" id="addall">Add all to pack</button>
     </div>
     <p class="hint">Use as <code>s("${esc(state.current)}:0")</code> … <code>:${files.length - 1}</code> — click a row to hear it.</p>
@@ -881,7 +914,10 @@ $('managesources').addEventListener('click', () => openSources())
 $('viewpick').addEventListener('change', () => {
   const view = state.views.find((v) => v.name === $('viewpick').value)
   if (view) { state.starred = new Set(view.sounds); $('viewname').value = view.name }
-  renderConnect(); renderSounds()
+  applyScopedPacks()
+  syncPackGlobal()
+  if (state.current && !state.sounds[state.current]) state.current = null
+  renderConnect(); renderSounds(); renderPane()
   say(view ? `Loaded view "${esc(view.name)}" — ${view.sounds.length} sounds starred.` : '')
 })
 
@@ -893,13 +929,18 @@ $('clear').addEventListener('click', () => { state.pack = []; renderPack(); say(
 $('publish').addEventListener('click', async () => {
   const existing = await (await fetch(`${API}/packs`)).json()
   const name = packName()
-  const body = existing.filter((p) => p.name !== name).concat({ name, files: state.pack.map((p) => p.path) })
+  const view = $('packglobal').checked || !$('viewpick').value ? null : $('viewpick').value
+  const body = existing
+    .filter((p) => !(p.name === name && (p.view ?? null) === view))
+    .concat({ name, files: state.pack.map((p) => p.path), view })
   const res = await fetch(`${API}/packs`, {
     method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   })
   const data = await res.json()
   if (!res.ok) return say(`Rejected: ${esc((data.errors || []).join('; '))}`, true)
-  say(`Added — use it now with <code>s("${esc(name)}:0")</code>`)
+  say(view
+    ? `Added to view "${esc(view)}" — use it now there with <code>s("${esc(name)}:0")</code>`
+    : `Added — use it now with <code>s("${esc(name)}:0")</code>`)
   await boot()
 })
 
@@ -922,11 +963,14 @@ $('saveview').addEventListener('click', async () => {
 $('delview').addEventListener('click', async () => {
   const name = $('viewpick').value
   if (!name) return
+  const scoped = state.packs.filter((p) => p.view === name)
+  if (scoped.length) {
+    const names = scoped.map((p) => p.name).join(', ')
+    if (!confirm(`"${name}" has ${scoped.length} pack(s) scoped to it (${names}) that will be deleted too. Continue?`)) return
+  }
   const res = await fetch(`${API}/views/${encodeURIComponent(name)}`, { method: 'DELETE' })
   if (!res.ok) return say('Could not delete that view.', true)
-  state.views = await res.json()
-  $('viewpick').value = ''
-  renderViews(); renderConnect()
+  await boot()
   say(`Deleted view "${esc(name)}".`)
 })
 
@@ -1027,15 +1071,16 @@ function renderViews() {
 async function boot() {
   const doc = await (await fetch(MANIFEST_URL, { cache: 'no-store' })).json()
   state.base = doc._base || ''
-  state.sounds = {}
+  state.baseSounds = {}
   // A fully pitch-noted sound renders in strudel.json as a note -> file map (for Strudel
   // to consume), not a plain array. The UI always works with a flat file list here.
-  for (const [k, v] of Object.entries(doc)) if (k !== '_base') state.sounds[k] = Array.isArray(v) ? v : Object.values(v)
+  for (const [k, v] of Object.entries(doc)) if (k !== '_base') state.baseSounds[k] = Array.isArray(v) ? v : Object.values(v)
 
   state.origin = {}
   state.sources = []
   state.views = []
   state.notes = {}
+  state.packs = []
   try {
     const health = await fetch(`${API}/health`)
     state.apiUp = health.ok
@@ -1043,14 +1088,18 @@ async function boot() {
       state.sources = await (await fetch(`${API}/sources`)).json()
       state.views = await (await fetch(`${API}/views`)).json()
       state.notes = await (await fetch(`${API}/notes`)).json()
+      state.packs = await (await fetch(`${API}/packs`)).json()
       for (const src of state.sources) for (const n of src.sounds) state.origin[n] = src.id
     }
   } catch { state.apiUp = false }
 
   $('refresh').hidden = !state.apiUp
+  renderViews()
+  applyScopedPacks()
+  syncPackGlobal()
   if (state.current && !state.sounds[state.current]) state.current = null
 
-  renderViews(); renderConnect(); renderSounds(); renderPane(); renderPack()
+  renderConnect(); renderSounds(); renderPane(); renderPack()
 }
 
 try {

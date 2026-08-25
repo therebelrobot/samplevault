@@ -258,7 +258,11 @@ older install is imported once on first boot, after which the UI owns them.
 **Caching.** A remote index is fetched once and cached for `REMOTE_TTL` seconds
 (default 24h). Audio files cache to disk on first play, so auditioning does not
 re-hit upstream and a pack keeps working if the upstream repo disappears.
-**Refresh sources** forces a re-index. The cache lives in `CACHE_DIR` and grows
+**Rescan library** (top of the page) forces a re-index: it re-walks local files
+and, ignoring the TTL, re-fetches every remote source index. Local files are
+also re-scanned automatically on change (see `WATCH` below); this button is
+for triggering it on demand, e.g. right after adding samples, without
+restarting the server. The remote cache lives in `CACHE_DIR` and grows
 unbounded — delete it whenever you want the space back.
 
 **Pin your refs.** A branch name means upstream can change the audio under a
@@ -314,7 +318,7 @@ Reached at `/samples/api/` through nginx.
 | `GET/PUT /api/sources`, `DELETE /api/sources/:id` | remote repo definitions |
 | `POST /api/sources/preview` | resolve a candidate repo without saving it |
 | `GET /api/sources` | resolved remote sources and the sound names each contributed |
-| `POST /api/sources/refresh` | re-fetches every remote index, ignoring the TTL |
+| `POST /api/sources/refresh` | rescans local files and re-fetches every remote index, ignoring the TTL |
 | `GET /api/remote/:id/*` | proxies one remote file, caching it to disk |
 | `GET /api/packs` | published packs |
 | `PUT /api/packs` | replaces all packs (validated), rewrites the manifest |

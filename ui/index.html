@@ -279,7 +279,7 @@
   <code id="connectline">loading…</code>
   <select id="viewpick" title="Which manifest to load"><option value="">Whole library</option></select>
   <button class="btn primary" id="copyurl">Copy</button>
-  <button class="btn tiny" id="refresh" hidden title="Re-fetch every remote source index">Refresh sources</button>
+  <button class="btn tiny" id="refresh" hidden title="Re-scan local files and re-fetch every remote source index">Rescan library</button>
 </section>
 
 <div class="stage">
@@ -435,6 +435,7 @@ function visibleNames() {
 
 function renderSounds() {
   const names = visibleNames()
+  const filtering = Boolean(state.filter || state.onlyStarred)
   const groups = [{ id: 'local', label: 'Local', names: names.filter((n) => !state.origin[n]) }]
   for (const src of state.sources) {
     groups.push({ id: src.id, label: src.label, names: names.filter((n) => state.origin[n] === src.id) })
@@ -443,7 +444,10 @@ function renderSounds() {
   const html = groups
     .filter((g) => g.names.length)
     .map((g) => {
-      const shut = state.collapsed.has(g.id)
+      // A group folded shut in a past session should not swallow matches
+      // while actively searching/starring — that would look identical to
+      // new sounds simply missing from the list.
+      const shut = !filtering && state.collapsed.has(g.id)
       return `
       <button class="group-head" data-group="${esc(g.id)}" aria-expanded="${!shut}">
         <span class="caret">${shut ? '▸' : '▾'}</span>
@@ -846,13 +850,14 @@ $('delview').addEventListener('click', async () => {
 
 $('refresh').addEventListener('click', async () => {
   $('refresh').disabled = true
-  say('Re-fetching remote source indexes…')
+  say('Rescanning local files and remote source indexes…')
   try {
     const data = await (await fetch(`${API}/sources/refresh`, { method: 'POST' })).json()
     await boot()
-    say(`Refreshed: ${esc((data.refreshed || []).join(', ')) || 'nothing'}`)
+    const remoteMsg = data.refreshed?.length ? `; remote refreshed: ${esc(data.refreshed.join(', '))}` : ''
+    say(`Rescanned — ${Object.keys(state.sounds).length} sound(s) in the library${remoteMsg}`)
   } catch (err) {
-    say(`Refresh failed — ${esc(err.message)}`, true)
+    say(`Rescan failed — ${esc(err.message)}`, true)
   }
   $('refresh').disabled = false
 })
@@ -956,7 +961,7 @@ async function boot() {
     }
   } catch { state.apiUp = false }
 
-  $('refresh').hidden = !state.apiUp || !state.sources.length
+  $('refresh').hidden = !state.apiUp
   if (state.current && !state.sounds[state.current]) state.current = null
 
   renderViews(); renderConnect(); renderSounds(); renderPane(); renderPack()
